@@ -30,6 +30,8 @@ Office.onReady((info) => {
     })
     addinInstance.start()
 
+    setInterval(_ => console.log('Interval'), 3000)
+
     // Register ItemChanged event handler only if supported
     if (Office.context.mailbox && Office.context.mailbox.addHandlerAsync) {
       registerItemChangedHandler()
