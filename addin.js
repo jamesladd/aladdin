@@ -15,12 +15,17 @@ function addin(queue) {
       return queue
     },
     start() {
-      console.log('AddIn - start')
+      queue.addEventListener('start', e => {
+        console.log('Jobs start:', e)
+      })
       queue.addEventListener('success', e => {
         console.log('Job ok:', e)
       })
       queue.addEventListener('error', e => {
         console.log('Job err:', e)
+      })
+      queue.addEventListener('end', e => {
+        console.log('Jobs end:', e)
       })
       queue.start(err => {
         if (err) console.error(err)
@@ -237,14 +242,6 @@ export class Queue extends EventTarget {
 
 
 // Common initialization function used by all execution contexts
-
 export function initializeAddIn(contextName) {
-  console.log(`Aladdin initializing in ${contextName} context`)
-  const addinInstance = createAddIn()
-
-  // Start the queue
-  addinInstance.start()
-
-  console.log(`Aladdin ready in ${contextName} context`)
-  return addinInstance
+  return createAddIn()
 }

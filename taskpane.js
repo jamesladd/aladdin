@@ -21,5 +21,6 @@ Office.onReady((info) => {
       const result = 'taskpane'
       cb(null, result)
     })
+    addinInstance.start()
   }
 })

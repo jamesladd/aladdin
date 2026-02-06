@@ -15,6 +15,7 @@ Office.onReady((info) => {
       const result = 'launchevent'
       cb(null, result)
     })
+    addinInstance.start()
   }
 })
 
