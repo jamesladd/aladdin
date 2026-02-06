@@ -4,10 +4,6 @@ import { initializeAddIn } from './addin.js'
 
 let addinInstance = null;
 
-(function() {
-  console.log('Aladin - taskpane')
-})();
-
 Office.onReady((info) => {
   console.log('Office.onReady called in taskpane', info)
 
@@ -21,6 +17,7 @@ Office.onReady((info) => {
     }
 
     addinInstance.queue().push(cb => {
+      console.log('taskpane - Here')
       const result = 'taskpane'
       cb(null, result)
     })

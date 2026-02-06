@@ -14,7 +14,6 @@ Office.onReady((info) => {
       const result = 'commands'
       cb(null, result)
     })
-    addinInstance.start()
   }
 })
 
