@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<OfficeApp
+        xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+        xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0"
+        xsi:type="MailApp">
+
+    <Id>aladdin-addin-12345</Id>
+    <Version>1.0.0.0</Version>
+    <ProviderName>Aladdin</ProviderName>
+    <DefaultLocale>en-US</DefaultLocale>
+    <DisplayName DefaultValue="Aladdin"/>
+    <Description DefaultValue="Minimal Outlook add-in with queue management"/>
+    <IconUrl DefaultValue="https://jamesladd.github.io/aladdin/icon-32.png"/>
+    <HighResolutionIconUrl DefaultValue="https://jamesladd.github.io/aladdin/icon-64.png"/>
+    <SupportUrl DefaultValue="https://jamesladd.github.io/aladdin"/>
+
+    <AppDomains>
+        <AppDomain>https://jamesladd.github.io</AppDomain>
+    </AppDomains>
+
+    <Hosts>
+        <Host Name="Mailbox"/>
+    </Hosts>
+
+    <Requirements>
+        <Sets>
+            <Set Name="Mailbox" MinVersion="1.1"/>
+        </Sets>
+    </Requirements>
+
+    <FormSettings>
+        <Form xsi:type="ItemRead">
+            <DesktopSettings>
+                <SourceLocation DefaultValue="https://jamesladd.github.io/aladdin/taskpane.html"/>
+                <RequestedHeight>250</RequestedHeight>
+            </DesktopSettings>
+        </Form>
+    </FormSettings>
+
+    <Permissions>ReadWriteItem</Permissions>
+
+    <Rule xsi:type="RuleCollection" Mode="Or">
+        <Rule xsi:type="ItemIs" ItemType="Message" FormType="Read"/>
+    </Rule>
+
+    <DisableEntityHighlighting>false</DisableEntityHighlighting>
+
+    <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides" xsi:type="VersionOverridesV1_0">
+        <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides/1.1" xsi:type="VersionOverridesV1_1">
+
+            <Requirements>
+                <bt:Sets DefaultMinVersion="1.5">
+                    <bt:Set Name="Mailbox"/>
+                </bt:Sets>
+            </Requirements>
+
+            <Hosts>
+                <Host xsi:type="MailHost">
+
+                    <DesktopFormFactor>
+                        <FunctionFile resid="Aladdin.FunctionFile.Url"/>
+
+                        <ExtensionPoint xsi:type="MessageReadCommandSurface">
+                            <OfficeTab id="TabDefault">
+                                <Group id="Aladdin.Group1">
+                                    <Label resid="Aladdin.Group1Label"/>
+
+                                    <Control xsi:type="Button" id="Aladdin.TaskpaneButton">
+                                        <Label resid="Aladdin.TaskpaneButton.Label"/>
+                                        <Supertip>
+                                            <Title resid="Aladdin.TaskpaneButton.Label"/>
+                                            <Description resid="Aladdin.TaskpaneButton.Tooltip"/>
+                                        </Supertip>
+                                        <Icon>
+                                            <bt:Image size="16" resid="Aladdin.Icon.16"/>
+                                            <bt:Image size="32" resid="Aladdin.Icon.32"/>
+                                            <bt:Image size="80" resid="Aladdin.Icon.80"/>
+                                        </Icon>
+                                        <Action xsi:type="ShowTaskpane">
+                                            <SourceLocation resid="Aladdin.Taskpane.Url"/>
+                                        </Action>
+                                    </Control>
+
+                                    <Control xsi:type="Button" id="Aladdin.ActionButton">
+                                        <Label resid="Aladdin.ActionButton.Label"/>
+                                        <Supertip>
+                                            <Title resid="Aladdin.ActionButton.Label"/>
+                                            <Description resid="Aladdin.ActionButton.Tooltip"/>
+                                        </Supertip>
+                                        <Icon>
+                                            <bt:Image size="16" resid="Aladdin.Icon.16"/>
+                                            <bt:Image size="32" resid="Aladdin.Icon.32"/>
+                                            <bt:Image size="80" resid="Aladdin.Icon.80"/>
+                                        </Icon>
+                                        <Action xsi:type="ExecuteFunction">
+                                            <FunctionName>action</FunctionName>
+                                        </Action>
+                                    </Control>
+
+                                </Group>
+                            </OfficeTab>
+                        </ExtensionPoint>
+
+                        <ExtensionPoint xsi:type="LaunchEvent">
+                            <LaunchEvents>
+                                <LaunchEvent Type="OnNewMessageCompose" FunctionName="onNewMessageComposeHandler"/>
+                                <LaunchEvent Type="OnMessageSend" FunctionName="onMessageSendHandler"/>
+                            </LaunchEvents>
+                            <SourceLocation resid="Aladdin.LaunchEvent.Url"/>
+                        </ExtensionPoint>
+
+                    </DesktopFormFactor>
+                </Host>
+            </Hosts>
+
+            <Resources>
+                <bt:Images>
+                    <bt:Image id="Aladdin.Icon.16" DefaultValue="https://jamesladd.github.io/aladdin/icon-16.png"/>
+                    <bt:Image id="Aladdin.Icon.32" DefaultValue="https://jamesladd.github.io/aladdin/icon-32.png"/>
+                    <bt:Image id="Aladdin.Icon.80" DefaultValue="https://jamesladd.github.io/aladdin/icon-80.png"/>
+                </bt:Images>
+                <bt:Urls>
+                    <bt:Url id="Aladdin.Taskpane.Url" DefaultValue="https://jamesladd.github.io/aladdin/taskpane.html"/>
+                    <bt:Url id="Aladdin.FunctionFile.Url" DefaultValue="https://jamesladd.github.io/aladdin/commands.html"/>
+                    <bt:Url id="Aladdin.LaunchEvent.Url" DefaultValue="https://jamesladd.github.io/aladdin/launchevent.html"/>
+                </bt:Urls>
+                <bt:ShortStrings>
+                    <bt:String id="Aladdin.Group1Label" DefaultValue="Aladdin"/>
+                    <bt:String id="Aladdin.TaskpaneButton.Label" DefaultValue="Show Taskpane"/>
+                    <bt:String id="Aladdin.ActionButton.Label" DefaultValue="Perform Action"/>
+                </bt:ShortStrings>
+                <bt:LongStrings>
+                    <bt:String id="Aladdin.TaskpaneButton.Tooltip" DefaultValue="Opens the Aladdin taskpane"/>
+                    <bt:String id="Aladdin.ActionButton.Tooltip" DefaultValue="Executes an action command"/>
+                </bt:LongStrings>
+            </Resources>
+
+        </VersionOverrides>
+    </VersionOverrides>
+
+</OfficeApp>
