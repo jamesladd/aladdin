@@ -16,7 +16,7 @@ function addin(queue) {
     },
     start() {
       queue.addEventListener('success', e => {
-        console.log('Job finished:', e.detail.toString().replace(/\n/g, ''))
+        console.log('Job finished:', e)
       })
       queue.start(err => {
         if (err) throw err
@@ -238,15 +238,15 @@ export function initializeAddIn(contextName) {
   console.log(`Aladdin initializing in ${contextName} context`)
   const addinInstance = createAddIn()
 
-  // Dispatch ready event
-  addinInstance.queue().push(cb => {
-    console.log('cb here')
-    const result = 'two'
-    cb(null, result)
-  })
-
   // Start the queue
   addinInstance.start()
+  setTimeout(_ => {
+    // Dispatch ready event
+    addinInstance.queue().push(cb => {
+      const result = 'two'
+      cb(null, result)
+    })
+  })
 
   console.log(`Aladdin ready in ${contextName} context`)
   return addinInstance
