@@ -8,13 +8,13 @@
 
     <!-- Basic Add-in Information -->
     <Id>f364dbc5-58e7-46f5-806f-248d0eb98fcb</Id>
-    <Version>1.7.0.0</Version>
+    <Version>1.8.0.0</Version>
     <ProviderName>Aladdin</ProviderName>
     <DefaultLocale>en-US</DefaultLocale>
-    <DisplayName DefaultValue="Aladdin D"/>
+    <DisplayName DefaultValue="Aladdin E"/>
     <Description DefaultValue="Minimal Outlook add-in with queue management"/>
-    <IconUrl DefaultValue="https://jamesladd.github.io/aladdin/icon-32.png"/>
-    <HighResolutionIconUrl DefaultValue="https://jamesladd.github.io/aladdin/icon-64.png"/>
+    <IconUrl DefaultValue="https://jamesladd.github.io/aladdin/assets/icon-32.png"/>
+    <HighResolutionIconUrl DefaultValue="https://jamesladd.github.io/aladdin/assets/icon-64.png"/>
     <SupportUrl DefaultValue="https://jamesladd.github.io/aladdin"/>
 
     <!-- Hosts -->
@@ -163,9 +163,9 @@
             <!-- Resources -->
             <Resources>
                 <bt:Images>
-                    <bt:Image id="Icon.16x16" DefaultValue="https://jamesladd.github.io/aladdin/icon-16.png"/>
-                    <bt:Image id="Icon.32x32" DefaultValue="https://jamesladd.github.io/aladdin/icon-32.png"/>
-                    <bt:Image id="Icon.80x80" DefaultValue="https://jamesladd.github.io/aladdin/icon-80.png"/>
+                    <bt:Image id="Icon.16x16" DefaultValue="https://jamesladd.github.io/aladdin/assets/icon-16.png"/>
+                    <bt:Image id="Icon.32x32" DefaultValue="https://jamesladd.github.io/aladdin/assets/icon-32.png"/>
+                    <bt:Image id="Icon.80x80" DefaultValue="https://jamesladd.github.io/aladdin/assets/icon-80.png"/>
                 </bt:Images>
                 <bt:Urls>
                     <bt:Url id="Commands.Url" DefaultValue="https://jamesladd.github.io/aladdin/commands.html"/>

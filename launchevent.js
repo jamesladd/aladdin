@@ -2,7 +2,11 @@
 
 import { initializeAddIn } from './addin.js'
 
-let addinInstance = null
+let addinInstance = null;
+
+(function() {
+  console.log('Aladin - launchevent')
+})();
 
 // Initialize when the runtime loads
 Office.onReady((info) => {
@@ -10,6 +14,10 @@ Office.onReady((info) => {
 
   if (info.host === Office.HostType.Outlook) {
     addinInstance = initializeAddIn('LaunchEvent')
+    addinInstance.queue().push(cb => {
+      const result = 'launchevent'
+      cb(null, result)
+    })
   }
 })
 
