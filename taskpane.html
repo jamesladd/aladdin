@@ -1,17 +1,21 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Aladdin Taskpane</title>
     <link rel="stylesheet" href="taskpane.css">
-    <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
 </head>
 <body>
 <div class="container">
     <h1>Aladdin</h1>
-    <p id="status">Initializing...</p>
+    <div id="status">Loading...</div>
+    <div id="eventCounts" class="event-counts">Events: 0</div>
+    <div class="info">
+        <p>Shared runtime enabled - all contexts share the same instance.</p>
+    </div>
 </div>
-<script type="module" src="taskpane.js"></script>
+<script type="module" src="addin.js"></script>
 </body>
 </html>
