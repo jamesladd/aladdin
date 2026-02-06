@@ -8,10 +8,10 @@
 
     <!-- Basic Add-in Information -->
     <Id>f364dbc5-58e7-46f5-806f-248d0eb98fcb</Id>
-    <Version>1.14.0.0</Version>
+    <Version>1.17.0.0</Version>
     <ProviderName>Aladdin</ProviderName>
     <DefaultLocale>en-US</DefaultLocale>
-    <DisplayName DefaultValue="Aladdin I"/>
+    <DisplayName DefaultValue="Aladdin J"/>
     <Description DefaultValue="Minimal Outlook add-in with queue management and shared runtime"/>
     <IconUrl DefaultValue="https://jamesladd.github.io/aladdin/assets/icon-32.png"/>
     <HighResolutionIconUrl DefaultValue="https://jamesladd.github.io/aladdin/assets/icon-64.png"/>
@@ -63,25 +63,17 @@
             <Hosts>
                 <Host xsi:type="MailHost">
 
-                    <!-- Shared Runtime Configuration -->
+                    <!-- Shared Runtime Configuration for Version Overrides 1.1 -->
                     <Runtimes>
                         <Runtime resid="Taskpane.Url">
-                            <Override type="javascript" resid="Addin.Url"/>
-                            <Actions>
-                                <Action xsi:type="ExecuteFunction" FunctionName="action"/>
-                                <Action xsi:type="ExecuteFunction" FunctionName="onNewMessageComposeHandler"/>
-                                <Action xsi:type="ExecuteFunction" FunctionName="onMessageSendHandler"/>
-                                <Action xsi:type="ExecuteFunction" FunctionName="onRecipientsChangedHandler"/>
-                                <Action xsi:type="ExecuteFunction" FunctionName="onFromChangedHandler"/>
-                            </Actions>
-                            <Lifetime>long</Lifetime>
+                            <Override type="javascript" resid="Runtime.Url"/>
                         </Runtime>
                     </Runtimes>
 
                     <!-- Desktop Form Factor -->
                     <DesktopFormFactor>
 
-                        <!-- Function File now references the shared runtime -->
+                        <!-- Function File references the shared runtime -->
                         <FunctionFile resid="Taskpane.Url"/>
 
                         <!-- Extension Point: Message Read Command Surface -->
@@ -196,7 +188,7 @@
                 </bt:Images>
                 <bt:Urls>
                     <bt:Url id="Taskpane.Url" DefaultValue="https://jamesladd.github.io/aladdin/taskpane.html"/>
-                    <bt:Url id="Addin.Url" DefaultValue="https://jamesladd.github.io/aladdin/addin.js"/>
+                    <bt:Url id="Runtime.Url" DefaultValue="https://jamesladd.github.io/aladdin/runtime.js"/>
                 </bt:Urls>
                 <bt:ShortStrings>
                     <bt:String id="GroupLabel" DefaultValue="Aladdin"/>

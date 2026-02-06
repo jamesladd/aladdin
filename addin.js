@@ -3,18 +3,18 @@
 const instance = [false]
 const has = Object.prototype.hasOwnProperty
 
-export function createAddIn() {
+export function createAddIn(Office) {
   if (instance[0]) {
     console.log('createAddIn - instance')
     return instance[0]
   }
   const queue = new Queue()
-  instance[0] = addin(queue)
+  instance[0] = addin(queue, Office)
   console.log('createAddIn - new')
   return instance[0]
 }
 
-function addin(queue) {
+function addin(queue, Office) {
   return {
     queue() {
       return queue
@@ -36,6 +36,7 @@ function addin(queue) {
         if (err) console.error(err)
       })
     },
+    Office,
     globalData: {},
     eventCounts: {
       commands: 0,
@@ -263,7 +264,8 @@ export function updateEventCountsDisplay() {
 export function initializeTaskpaneUI() {
   const statusElement = document.getElementById('status')
   if (statusElement) {
-    const hasItem = Office.context.mailbox && Office.context.mailbox.item
+    const addinInstance = createAddIn()
+    const hasItem = addinInstance.Office.context.mailbox && addinInstance.Office.context.mailbox.item
     if (hasItem) {
       statusElement.textContent = 'Aladdin is ready! Item selected.'
     } else {
@@ -276,12 +278,13 @@ export function initializeTaskpaneUI() {
 
 // Register ItemChanged event handler
 export function registerItemChangedHandler() {
-  if (Office.context.mailbox && Office.context.mailbox.addHandlerAsync) {
-    Office.context.mailbox.addHandlerAsync(
-      Office.EventType.ItemChanged,
+  const addinInstance = createAddIn()
+  if (addinInstance.Office.context.mailbox && addinInstance.Office.context.mailbox.addHandlerAsync) {
+    addinInstance.Office.context.mailbox.addHandlerAsync(
+      addinInstance.Office.EventType.ItemChanged,
       onItemChanged,
       (asyncResult) => {
-        if (asyncResult.status === Office.AsyncResultStatus.Failed) {
+        if (asyncResult.status === addinInstance.Office.AsyncResultStatus.Failed) {
           console.error('Failed to register ItemChanged handler:', asyncResult.error.message)
         } else {
           console.log('ItemChanged handler registered successfully')
@@ -298,7 +301,7 @@ export function onItemChanged(eventArgs) {
   const addinInstance = createAddIn()
   addinInstance.eventCounts.itemChanges++
 
-  const hasItem = Office.context.mailbox && Office.context.mailbox.item
+  const hasItem = addinInstance.Office.context.mailbox && addinInstance.Office.context.mailbox.item
 
   addinInstance.queue().push(cb => {
     console.log('Processing item change in shared queue')
@@ -310,7 +313,7 @@ export function onItemChanged(eventArgs) {
   const statusElement = document.getElementById('status')
   if (statusElement) {
     if (hasItem) {
-      const subject = Office.context.mailbox.item.subject || 'No subject'
+      const subject = addinInstance.Office.context.mailbox.item.subject || 'No subject'
       statusElement.textContent = `Item: ${subject}`
     } else {
       statusElement.textContent = 'Aladdin is ready! No item selected.'
@@ -419,10 +422,24 @@ export function onFromChangedHandler(event) {
   event.completed()
 }
 
+// Initialize Office.actions associations
+export function initializeAssociations(Office) {
+  if (Office && Office.actions) {
+    Office.actions.associate("action", action)
+    Office.actions.associate("onNewMessageComposeHandler", onNewMessageComposeHandler)
+    Office.actions.associate("onMessageSendHandler", onMessageSendHandler)
+    Office.actions.associate("onRecipientsChangedHandler", onRecipientsChangedHandler)
+    Office.actions.associate("onFromChangedHandler", onFromChangedHandler)
+    console.log('Office.actions associations registered')
+  } else {
+    console.warn('Office.actions not available for registration')
+  }
+}
+
 // Initialize the add-in - called by Office.onReady
-export function initializeAddIn() {
+export function initializeAddIn(Office) {
   // Create single shared instance using singleton pattern
-  const addinInstance = createAddIn()
+  const addinInstance = createAddIn(Office)
 
   addinInstance.queue().push(cb => {
     console.log('Add-in initialized')
@@ -445,22 +462,4 @@ export function initializeAddIn() {
   registerItemChangedHandler()
 
   return addinInstance
-}
-
-// Office.onReady initialization
-Office.onReady((info) => {
-  console.log('Office.onReady called', info)
-
-  if (info.host === Office.HostType.Outlook) {
-    initializeAddIn()
-  }
-})
-
-// Register all functions with Office
-if (typeof Office !== 'undefined' && Office.actions) {
-  Office.actions.associate("action", action)
-  Office.actions.associate("onNewMessageComposeHandler", onNewMessageComposeHandler)
-  Office.actions.associate("onMessageSendHandler", onMessageSendHandler)
-  Office.actions.associate("onRecipientsChangedHandler", onRecipientsChangedHandler)
-  Office.actions.associate("onFromChangedHandler", onFromChangedHandler)
 }
