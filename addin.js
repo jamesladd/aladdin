@@ -1,17 +1,16 @@
 // addin.js
 
-const instance = [false]
-const has = Object.prototype.hasOwnProperty
-
 export function createAddIn(Office) {
-  if (instance[0]) {
-    console.log('createAddIn - instance')
-    return instance[0]
+  if (typeof window !== 'undefined' && window.aladdinInstance) {
+    console.log('createAddIn - instance from window')
+    return window.aladdinInstance
   }
-  const queue = new Queue()
-  instance[0] = addin(queue, Office)
+
   console.log('createAddIn - new')
-  return instance[0]
+  const queue = new Queue()
+  const instance = addin(queue, Office)
+  if (typeof window !== 'undefined') window.aladdinInstance = instance;
+  return instance
 }
 
 function addin(queue, Office) {
@@ -45,6 +44,8 @@ function addin(queue, Office) {
     }
   }
 }
+
+const has = Object.prototype.hasOwnProperty
 
 export class QueueEvent extends Event {
   constructor (name, detail) {
@@ -300,7 +301,6 @@ export function onItemChanged(eventArgs) {
 
   const addinInstance = createAddIn()
   addinInstance.eventCounts.itemChanges++
-
   const hasItem = addinInstance.Office.context.mailbox && addinInstance.Office.context.mailbox.item
 
   addinInstance.queue().push(cb => {
@@ -320,6 +320,7 @@ export function onItemChanged(eventArgs) {
     }
   }
 
+  addinInstance.start()
   updateEventCountsDisplay()
 }
 
@@ -340,9 +341,9 @@ export function action(event) {
     cb(null, result)
   })
 
+  addinInstance.start()
   updateEventCountsDisplay()
 
-  // Signal that the command is complete
   event.completed()
 }
 
@@ -362,6 +363,7 @@ export function onNewMessageComposeHandler(event) {
     cb(null, 'new-message-compose')
   })
 
+  addinInstance.start()
   updateEventCountsDisplay()
 
   event.completed()
@@ -380,9 +382,9 @@ export function onMessageSendHandler(event) {
     cb(null, 'message-send')
   })
 
+  addinInstance.start()
   updateEventCountsDisplay()
 
-  // Allow the message to be sent
   event.completed({ allowEvent: true })
 }
 
@@ -399,6 +401,7 @@ export function onRecipientsChangedHandler(event) {
     cb(null, 'recipients-changed')
   })
 
+  addinInstance.start()
   updateEventCountsDisplay()
 
   event.completed()
@@ -417,6 +420,7 @@ export function onFromChangedHandler(event) {
     cb(null, 'from-changed')
   })
 
+  addinInstance.start()
   updateEventCountsDisplay()
 
   event.completed()
@@ -438,16 +442,8 @@ export function initializeAssociations(Office) {
 
 // Initialize the add-in - called by Office.onReady
 export function initializeAddIn(Office) {
-  // Create single shared instance using singleton pattern
+
   const addinInstance = createAddIn(Office)
-
-  addinInstance.queue().push(cb => {
-    console.log('Add-in initialized')
-    const result = 'addin-initialized'
-    cb(null, result)
-  })
-
-  addinInstance.start()
 
   // Initialize taskpane UI if DOM is ready
   if (typeof document !== 'undefined') {
@@ -458,7 +454,13 @@ export function initializeAddIn(Office) {
     }
   }
 
-  // Register ItemChanged event handler
+  addinInstance.queue().push(cb => {
+    console.log('Add-in initialized')
+    const result = 'addin-initialized'
+    cb(null, result)
+  })
+  addinInstance.start()
+
   registerItemChangedHandler()
 
   return addinInstance
