@@ -8,10 +8,10 @@
 
     <!-- Basic Add-in Information -->
     <Id>f364dbc5-58e7-46f5-806f-248d0eb98fcb</Id>
-    <Version>1.13.0.0</Version>
+    <Version>1.11.0.0</Version>
     <ProviderName>Aladdin</ProviderName>
     <DefaultLocale>en-US</DefaultLocale>
-    <DisplayName DefaultValue="Aladdin J"/>
+    <DisplayName DefaultValue="Aladdin H"/>
     <Description DefaultValue="Minimal Outlook add-in with queue management"/>
     <IconUrl DefaultValue="https://jamesladd.github.io/aladdin/assets/icon-32.png"/>
     <HighResolutionIconUrl DefaultValue="https://jamesladd.github.io/aladdin/assets/icon-64.png"/>
@@ -140,6 +140,23 @@
                                         </Icon>
                                         <Action xsi:type="ShowTaskpane">
                                             <SourceLocation resid="Taskpane.Url"/>
+                                        </Action>
+                                    </Control>
+
+                                    <!-- Action Button for Compose Mode -->
+                                    <Control xsi:type="Button" id="ComposeActionButton">
+                                        <Label resid="ActionButton.Label"/>
+                                        <Supertip>
+                                            <Title resid="ActionButton.Label"/>
+                                            <Description resid="ActionButton.Tooltip"/>
+                                        </Supertip>
+                                        <Icon>
+                                            <bt:Image size="16" resid="Icon.16x16"/>
+                                            <bt:Image size="32" resid="Icon.32x32"/>
+                                            <bt:Image size="80" resid="Icon.80x80"/>
+                                        </Icon>
+                                        <Action xsi:type="ExecuteFunction">
+                                            <FunctionName>action</FunctionName>
                                         </Action>
                                     </Control>
 
