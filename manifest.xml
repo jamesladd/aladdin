@@ -6,8 +6,8 @@
         xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0"
         xsi:type="MailApp">
 
-    <Id>aladdin-addin-12345</Id>
-    <Version>1.0.0.0</Version>
+    <Id>a1add1n0-0000-4000-8000-000000000001</Id>
+    <Version>1.2.0.0</Version>
     <ProviderName>Aladdin</ProviderName>
     <DefaultLocale>en-US</DefaultLocale>
     <DisplayName DefaultValue="Aladdin"/>
