@@ -5,6 +5,10 @@
     <meta http-equiv="X-UA-Compatible" content="IE=Edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Aladdin Taskpane</title>
+
+    <!-- Load Office.js first -->
+    <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+
     <link rel="stylesheet" href="taskpane.css">
 </head>
 <body>
@@ -16,6 +20,8 @@
         <p>Shared runtime enabled - all contexts share the same instance.</p>
     </div>
 </div>
+
+<!-- Load runtime.js as a module AFTER Office.js -->
 <script type="module" src="runtime.js"></script>
 </body>
 </html>
