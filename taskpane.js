@@ -10,10 +10,17 @@ Office.onReady((info) => {
   if (info.host === Office.HostType.Outlook) {
     addinInstance = initializeAddIn('Taskpane')
 
+    // Check if an item is available
+    const hasItem = Office.context.mailbox && Office.context.mailbox.item
+
     // Update UI to show ready status
     const statusElement = document.getElementById('status')
     if (statusElement) {
-      statusElement.textContent = 'Aladdin is ready!'
+      if (hasItem) {
+        statusElement.textContent = 'Aladdin is ready! Item selected.'
+      } else {
+        statusElement.textContent = 'Aladdin is ready! No item selected.'
+      }
     }
 
     addinInstance.queue().push(cb => {
@@ -23,36 +30,38 @@ Office.onReady((info) => {
     })
     addinInstance.start()
 
-    // Register ItemChanged event handler
-    registerItemChangedHandler()
+    // Register ItemChanged event handler only if supported
+    if (Office.context.mailbox && Office.context.mailbox.addHandlerAsync) {
+      registerItemChangedHandler()
+    } else {
+      console.log('ItemChanged handler not supported in this context')
+    }
   }
 })
 
 function registerItemChangedHandler() {
-  if (Office.context.mailbox.addHandlerAsync) {
-    Office.context.mailbox.addHandlerAsync(
-      Office.EventType.ItemChanged,
-      onItemChanged,
-      (asyncResult) => {
-        if (asyncResult.status === Office.AsyncResultStatus.Failed) {
-          console.error('Failed to register ItemChanged handler:', asyncResult.error.message)
-        } else {
-          console.log('ItemChanged handler registered successfully')
-        }
+  Office.context.mailbox.addHandlerAsync(
+    Office.EventType.ItemChanged,
+    onItemChanged,
+    (asyncResult) => {
+      if (asyncResult.status === Office.AsyncResultStatus.Failed) {
+        console.error('Failed to register ItemChanged handler:', asyncResult.error.message)
+      } else {
+        console.log('ItemChanged handler registered successfully')
       }
-    )
-  } else {
-    console.warn('addHandlerAsync not available in this context')
-  }
+    }
+  )
 }
 
 function onItemChanged(eventArgs) {
   console.log('ItemChanged event triggered', eventArgs)
 
+  const hasItem = Office.context.mailbox && Office.context.mailbox.item
+
   if (addinInstance) {
     addinInstance.queue().push(cb => {
       console.log('Processing item change in queue')
-      const result = 'item-changed'
+      const result = hasItem ? 'item-changed-with-item' : 'item-changed-no-item'
       cb(null, result)
     })
     addinInstance.start()
@@ -61,7 +70,11 @@ function onItemChanged(eventArgs) {
   // Update UI to reflect the item change
   const statusElement = document.getElementById('status')
   if (statusElement) {
-    const itemType = Office.context.mailbox.item ? 'Item selected' : 'No item selected'
-    statusElement.textContent = `${itemType} - Aladdin is ready!`
+    if (hasItem) {
+      const subject = Office.context.mailbox.item.subject || 'No subject'
+      statusElement.textContent = `Item: ${subject}`
+    } else {
+      statusElement.textContent = 'Aladdin is ready! No item selected.'
+    }
   }
 }
