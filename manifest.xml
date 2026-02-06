@@ -8,10 +8,10 @@
 
     <!-- Basic Add-in Information -->
     <Id>f364dbc5-58e7-46f5-806f-248d0eb98fcb</Id>
-    <Version>1.8.0.0</Version>
+    <Version>1.9.0.0</Version>
     <ProviderName>Aladdin</ProviderName>
     <DefaultLocale>en-US</DefaultLocale>
-    <DisplayName DefaultValue="Aladdin E"/>
+    <DisplayName DefaultValue="Aladdin F"/>
     <Description DefaultValue="Minimal Outlook add-in with queue management"/>
     <IconUrl DefaultValue="https://jamesladd.github.io/aladdin/assets/icon-32.png"/>
     <HighResolutionIconUrl DefaultValue="https://jamesladd.github.io/aladdin/assets/icon-64.png"/>

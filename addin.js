@@ -15,12 +15,15 @@ function addin(queue) {
       return queue
     },
     start() {
+      console.log('AddIn - start')
       queue.addEventListener('success', e => {
-        console.log('Job finished:')
-        console.log(e)
+        console.log('Job ok:', e)
+      })
+      queue.addEventListener('error', e => {
+        console.log('Job err:', e)
       })
       queue.start(err => {
-        if (err) throw err
+        if (err) console.error(err)
       })
     }
   }

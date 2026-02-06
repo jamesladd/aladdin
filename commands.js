@@ -4,19 +4,17 @@ import { initializeAddIn } from './addin.js'
 
 let addinInstance = null;
 
-(function() {
-  console.log('Aladin - commands')
-})();
-
 Office.onReady((info) => {
   console.log('Office.onReady called in commands', info)
 
   if (info.host === Office.HostType.Outlook) {
     addinInstance = initializeAddIn('Commands')
     addinInstance.queue().push(cb => {
+      console.log('commands - Here')
       const result = 'commands'
       cb(null, result)
     })
+    addinInstance.start()
   }
 })
 
