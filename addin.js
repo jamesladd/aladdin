@@ -239,10 +239,11 @@ export function initializeAddIn(contextName) {
   const addinInstance = createAddIn()
 
   // Dispatch ready event
-  addinInstance.queue().dispatchEvent(new QueueEvent('ready', {
-    context: contextName,
-    timestamp: new Date().toISOString()
-  }))
+  addinInstance.queue().push(cb => {
+    console.log('cb here')
+    const result = 'two'
+    cb(null, result)
+  })
 
   // Start the queue
   addinInstance.start()

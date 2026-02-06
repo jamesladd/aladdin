@@ -15,10 +15,5 @@ Office.onReady((info) => {
     if (statusElement) {
       statusElement.textContent = 'Aladdin is ready!'
     }
-
-    // Listen for ready event
-    addinInstance.queue().addEventListener('ready', (e) => {
-      console.log('Taskpane ready event received:', e.detail)
-    })
   }
 })

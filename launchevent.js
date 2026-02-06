@@ -10,11 +10,6 @@ Office.onReady((info) => {
 
   if (info.host === Office.HostType.Outlook) {
     addinInstance = initializeAddIn('LaunchEvent')
-
-    // Listen for ready event
-    addinInstance.queue().addEventListener('ready', (e) => {
-      console.log('LaunchEvent ready event received:', e.detail)
-    })
   }
 })
 
