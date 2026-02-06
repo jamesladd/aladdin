@@ -1,9 +1,10 @@
-// launchevent.js - LaunchEvent execution context
+// launchevent.js - Direct JavaScript runtime for LaunchEvents
 
 import { initializeAddIn } from './addin.js'
 
 let addinInstance = null
 
+// Initialize when the runtime loads
 Office.onReady((info) => {
   console.log('Office.onReady called in launchevent', info)
 
@@ -41,6 +42,8 @@ function onMessageSendHandler(event) {
   event.completed({ allowEvent: true })
 }
 
-// Register the functions
-Office.actions.associate("onNewMessageComposeHandler", onNewMessageComposeHandler)
-Office.actions.associate("onMessageSendHandler", onMessageSendHandler)
+// Register the functions with Office
+if (typeof Office !== 'undefined' && Office.actions) {
+  Office.actions.associate("onNewMessageComposeHandler", onNewMessageComposeHandler)
+  Office.actions.associate("onMessageSendHandler", onMessageSendHandler)
+}
