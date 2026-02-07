@@ -11,6 +11,7 @@ export function createAddIn(Office) {
   if (typeof window !== 'undefined') window.aladdinInstance = instance;
   if (typeof window === 'undefined') singleton[0] = instance;
   instance.loadState()
+  instance.watchStorage()
   return instance
 }
 
@@ -39,6 +40,8 @@ function addin(queue, Office) {
         itemChanges: 0
       }
     },
+    _storageWatcher: null,
+    _pollInterval: null,
     state() {
       return this._state
     },
@@ -70,6 +73,70 @@ function addin(queue, Office) {
       if (changes.eventCounts) Object.assign(this._state.eventCounts, changes.eventCounts);
       if (changes.globalData) Object.assign(this._state.globalData, changes.globalData);
       this.saveState()
+    },
+    watchStorage() {
+      if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+        // Listen for storage events (from other tabs/windows)
+        this._storageWatcher = (event) => {
+          if (event.key === STATE_KEY && event.newValue) {
+            console.log('Storage changed externally, reloading state')
+            try {
+              this._state = JSON.parse(event.newValue)
+              this.onStateChanged()
+            } catch (error) {
+              console.error('Error parsing external state change:', error)
+            }
+          }
+        }
+        window.addEventListener('storage', this._storageWatcher)
+        console.log('Storage watcher registered')
+
+        // Also poll for changes in same window (storage event doesn't fire for same-window changes)
+        this._pollInterval = setInterval(() => {
+          this.checkStateChanged()
+        }, 2000)
+        console.log('Storage polling started')
+      }
+    },
+    unwatchStorage() {
+      if (this._storageWatcher && typeof window !== 'undefined') {
+        window.removeEventListener('storage', this._storageWatcher)
+        this._storageWatcher = null
+        console.log('Storage watcher removed')
+      }
+      if (this._pollInterval) {
+        clearInterval(this._pollInterval)
+        this._pollInterval = null
+        console.log('Storage polling stopped')
+      }
+    },
+    checkStateChanged() {
+      if (typeof localStorage !== 'undefined') {
+        try {
+          const stateJson = localStorage.getItem(STATE_KEY)
+          if (stateJson) {
+            const newState = JSON.parse(stateJson)
+            // Simple comparison - in production you might want deep equality check
+            if (JSON.stringify(newState) !== JSON.stringify(this._state)) {
+              console.log('State changed in localStorage, reloading')
+              this._state = newState
+              this.onStateChanged()
+            }
+          }
+        } catch (error) {
+          console.error('Error checking state changes:', error)
+        }
+      }
+    },
+    onStateChanged() {
+      console.log('State changed:', this._state)
+      // Update UI when state changes
+      updateEventCountsDisplay()
+    },
+    cleanup() {
+      console.log('Cleaning up addin instance')
+      this.unwatchStorage()
+      this.queue().stop()
     }
   }
 }
@@ -593,6 +660,16 @@ export function initializeAddIn(Office) {
     } else {
       initializeTaskpaneUI()
     }
+
+    // Cleanup when window unloads
+    window.addEventListener('beforeunload', () => {
+      console.log('Window unloading, cleaning up')
+      addinInstance.cleanup()
+    })
+    window.addEventListener('pagehide', () => {
+      console.log('Page hiding, cleaning up')
+      addinInstance.cleanup()
+    })
   }
 
   addinInstance.queue().push(cb => {
