@@ -3,7 +3,7 @@
 import {
   initializeAddIn,
   initializeAssociations
-} from './addin.js'
+} from './aladdin.js'
 
 // Wait for Office to be available
 function initializeRuntime() {

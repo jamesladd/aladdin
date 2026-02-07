@@ -1,4 +1,4 @@
-// addin.js
+// aladdin.js
 
 const singleton = [false]
 const STATE_KEY = 'aladdin-addin-state'
@@ -7,7 +7,7 @@ export function createAddIn(Office) {
   if (typeof window !== 'undefined' && window.aladdinInstance) return window.aladdinInstance;
   if (singleton[0]) return singleton[0];
   const queue = new Queue()
-  const instance = addin(queue, Office)
+  const instance = aladdin(queue, Office)
   if (typeof window !== 'undefined') window.aladdinInstance = instance;
   if (typeof window === 'undefined') singleton[0] = instance;
   instance.loadState()
@@ -15,7 +15,7 @@ export function createAddIn(Office) {
   return instance
 }
 
-function addin(queue, Office) {
+function aladdin(queue, Office) {
   return {
     queue() {
       return queue
