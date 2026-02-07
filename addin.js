@@ -1,11 +1,14 @@
 // addin.js
 
+const singleton = [false]
+
 export function createAddIn(Office) {
   if (typeof window !== 'undefined' && window.aladdinInstance) return window.aladdinInstance;
+  if (singleton[0]) return singleton[0];
   const queue = new Queue()
   const instance = addin(queue, Office)
   if (typeof window !== 'undefined') window.aladdinInstance = instance;
-  if (typeof window !== 'undefined') console.log(window);
+  if (typeof window === 'undefined') singleton[0] = instance;
   return instance
 }
 
@@ -248,6 +251,7 @@ export function updateEventCountsDisplay() {
     countsElement.textContent = `Commands: ${addinInstance.eventCounts.commands}, ` +
       `Launch Events: ${addinInstance.eventCounts.launchEvents}, ` +
       `Item Changes: ${addinInstance.eventCounts.itemChanges}`
+    console.log('Global Data', addinInstance.globalData)
   }
 }
 
