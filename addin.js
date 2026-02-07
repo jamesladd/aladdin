@@ -2,10 +2,10 @@
 
 export function createAddIn(Office) {
   if (typeof window !== 'undefined' && window.aladdinInstance) return window.aladdinInstance;
-  console.log('createAddIn - new')
   const queue = new Queue()
   const instance = addin(queue, Office)
   if (typeof window !== 'undefined') window.aladdinInstance = instance;
+  if (typeof window !== 'undefined') console.log(window);
   return instance
 }
 
@@ -16,7 +16,7 @@ function addin(queue, Office) {
     },
     start() {
       queue.addEventListener('success', e => {
-        console.log('Job ok:', e)
+        console.log('Job ok:', JSON.stringify(e.detail, null, 2))
       })
       queue.addEventListener('error', e => {
         console.error('Job err:', e)
@@ -382,7 +382,6 @@ export function initializeAddIn(Office) {
   }
 
   addinInstance.queue().push(cb => {
-    console.log('Add-in initialized')
     const result = 'addin-initialized'
     cb(null, result)
   })
