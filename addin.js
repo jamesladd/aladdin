@@ -357,6 +357,36 @@ export function onFromChangedHandler(event) {
   event.completed()
 }
 
+// VisibilityChanged event handler
+export function onVisibilityChanged(args) {
+  console.log('VisibilityChanged event triggered', args)
+  const addinInstance = createAddIn()
+  addinInstance.globalData.lastVisibilityMode = args.visibilityMode
+  addinInstance.globalData.lastVisibilityChange = new Date().toISOString()
+
+  const statusElement = document.getElementById('status')
+  if (statusElement) {
+    const mode = args.visibilityMode === addinInstance.Office.VisibilityMode.Hidden
+      ? 'hidden'
+      : 'visible'
+    statusElement.textContent = `Taskpane is now ${mode}`
+  }
+  updateEventCountsDisplay()
+}
+
+// Register VisibilityChanged event handler
+export function registerVisibilityChangedHandler() {
+  const addinInstance = createAddIn()
+  if (addinInstance.Office.addin && addinInstance.Office.addin.onVisibilityModeChanged) {
+    addinInstance.Office.addin.onVisibilityModeChanged(
+      onVisibilityChanged
+    )
+    console.log('VisibilityChanged handler registered successfully')
+  } else {
+    console.warn('Office.addin.onVisibilityModeChanged not available')
+  }
+}
+
 // Initialize Office.actions associations
 export function initializeAssociations(Office) {
   if (Office && Office.actions) {
@@ -392,6 +422,7 @@ export function initializeAddIn(Office) {
   addinInstance.start()
 
   registerItemChangedHandler()
+  registerVisibilityChangedHandler()
 
   return addinInstance
 }
