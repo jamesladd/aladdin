@@ -270,6 +270,32 @@ export function initializeTaskpaneUI() {
   updateEventCountsDisplay()
 }
 
+// Show the taskpane programmatically
+export function showAsTaskpane() {
+  const addinInstance = createAddIn()
+
+  if (!addinInstance.Office.addin) {
+    console.error('Office.addin not available')
+    return Promise.reject(new Error('Office.addin not available'))
+  }
+
+  if (typeof addinInstance.Office.addin.showAsTaskpane !== 'function') {
+    console.error('Office.addin.showAsTaskpane not available')
+    return Promise.reject(new Error('Office.addin.showAsTaskpane not available'))
+  }
+
+  return addinInstance.Office.addin.showAsTaskpane()
+    .then(() => {
+      console.log('Taskpane shown successfully')
+      addinInstance.globalData.lastTaskpaneShow = new Date().toISOString()
+      return true
+    })
+    .catch(error => {
+      console.error('Error showing taskpane:', error)
+      throw error
+    })
+}
+
 // Register ItemChanged event handler
 export function registerItemChangedHandler() {
   const addinInstance = createAddIn()
@@ -307,6 +333,85 @@ export function onItemChanged(eventArgs) {
   updateEventCountsDisplay()
 }
 
+// Register VisibilityChanged event handler
+export function registerVisibilityChangedHandler() {
+  const addinInstance = createAddIn()
+
+  // Check if Office.addin exists
+  if (!addinInstance.Office.addin) {
+    console.warn('Office.addin not available')
+    registerDocumentVisibilityHandler()
+    return
+  }
+
+  // Try using setStartupBehavior if available (for visibility on startup)
+  if (typeof addinInstance.Office.addin.setStartupBehavior === 'function') {
+    addinInstance.Office.addin.setStartupBehavior(
+      addinInstance.Office.StartupBehavior.load
+    ).then(() => {
+      console.log('Startup behavior set to load')
+    }).catch(err => {
+      console.warn('Could not set startup behavior:', err)
+    })
+  }
+
+  // Try to register onVisibilityModeChanged
+  if (typeof addinInstance.Office.addin.onVisibilityModeChanged === 'function') {
+    try {
+      addinInstance.Office.addin.onVisibilityModeChanged(onVisibilityChanged)
+      console.log('Office.addin.onVisibilityModeChanged handler registered successfully')
+    } catch (error) {
+      console.error('Error registering onVisibilityModeChanged handler:', error)
+      registerDocumentVisibilityHandler()
+    }
+  } else {
+    console.warn('Office.addin.onVisibilityModeChanged not available, using fallback')
+    registerDocumentVisibilityHandler()
+  }
+}
+
+// Register document visibility change handler (fallback)
+function registerDocumentVisibilityHandler() {
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', onDocumentVisibilityChanged)
+    console.log('Document visibilitychange handler registered (fallback)')
+  }
+}
+
+// Office.addin visibility change handler
+export function onVisibilityChanged(args) {
+  console.log('Office VisibilityChanged event triggered', args)
+  const addinInstance = createAddIn()
+  addinInstance.globalData.lastVisibilityMode = args.visibilityMode
+  addinInstance.globalData.lastVisibilityChange = new Date().toISOString()
+
+  const statusElement = document.getElementById('status')
+  if (statusElement) {
+    const mode = args.visibilityMode === addinInstance.Office.VisibilityMode.Hidden
+      ? 'hidden'
+      : 'visible'
+    statusElement.textContent = `Taskpane is now ${mode}`
+  }
+  updateEventCountsDisplay()
+}
+
+// Document visibility change handler (fallback)
+function onDocumentVisibilityChanged() {
+  const addinInstance = createAddIn()
+  const isHidden = document.hidden
+
+  console.log('Document visibility changed, hidden:', isHidden)
+  addinInstance.globalData.lastVisibilityState = isHidden ? 'hidden' : 'visible'
+  addinInstance.globalData.lastVisibilityChange = new Date().toISOString()
+
+  const statusElement = document.getElementById('status')
+  if (statusElement) {
+    const mode = isHidden ? 'hidden' : 'visible'
+    statusElement.textContent = `Taskpane is now ${mode}`
+  }
+  updateEventCountsDisplay()
+}
+
 // Command function for ribbon button
 export function action(event) {
   console.log('Action command executed')
@@ -323,6 +428,16 @@ export function onNewMessageComposeHandler(event) {
   const addinInstance = createAddIn()
   addinInstance.eventCounts.launchEvents++
   addinInstance.globalData.lastEvent = 'OnNewMessageCompose'
+
+  // Show taskpane when new message is composed
+  showAsTaskpane()
+    .then(() => {
+      console.log('Taskpane opened from OnNewMessageCompose')
+    })
+    .catch(err => {
+      console.warn('Could not show taskpane:', err)
+    })
+
   updateEventCountsDisplay()
   event.completed()
 }
@@ -355,36 +470,6 @@ export function onFromChangedHandler(event) {
   addinInstance.globalData.lastEvent = 'OnMessageFromChanged'
   updateEventCountsDisplay()
   event.completed()
-}
-
-// VisibilityChanged event handler
-export function onVisibilityChanged(args) {
-  console.log('VisibilityChanged event triggered', args)
-  const addinInstance = createAddIn()
-  addinInstance.globalData.lastVisibilityMode = args.visibilityMode
-  addinInstance.globalData.lastVisibilityChange = new Date().toISOString()
-
-  const statusElement = document.getElementById('status')
-  if (statusElement) {
-    const mode = args.visibilityMode === addinInstance.Office.VisibilityMode.Hidden
-      ? 'hidden'
-      : 'visible'
-    statusElement.textContent = `Taskpane is now ${mode}`
-  }
-  updateEventCountsDisplay()
-}
-
-// Register VisibilityChanged event handler
-export function registerVisibilityChangedHandler() {
-  const addinInstance = createAddIn()
-  if (addinInstance.Office.addin && addinInstance.Office.addin.onVisibilityModeChanged) {
-    addinInstance.Office.addin.onVisibilityModeChanged(
-      onVisibilityChanged
-    )
-    console.log('VisibilityChanged handler registered successfully')
-  } else {
-    console.warn('Office.addin.onVisibilityModeChanged not available')
-  }
 }
 
 // Initialize Office.actions associations
@@ -423,6 +508,17 @@ export function initializeAddIn(Office) {
 
   registerItemChangedHandler()
   registerVisibilityChangedHandler()
+
+  // Show taskpane after a delay
+  setTimeout(() => {
+    showAsTaskpane()
+      .then(() => {
+        console.log('Taskpane auto-opened after initialization')
+      })
+      .catch(err => {
+        console.warn('Could not auto-open taskpane:', err)
+      })
+  }, 2000)
 
   return addinInstance
 }
