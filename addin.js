@@ -1,11 +1,7 @@
 // addin.js
 
 export function createAddIn(Office) {
-  if (typeof window !== 'undefined' && window.aladdinInstance) {
-    console.log('createAddIn - instance from window')
-    return window.aladdinInstance
-  }
-
+  if (typeof window !== 'undefined' && window.aladdinInstance) return window.aladdinInstance;
   console.log('createAddIn - new')
   const queue = new Queue()
   const instance = addin(queue, Office)
@@ -19,17 +15,11 @@ function addin(queue, Office) {
       return queue
     },
     start() {
-      queue.addEventListener('start', e => {
-        console.log('Jobs start:', e)
-      })
       queue.addEventListener('success', e => {
         console.log('Job ok:', e)
       })
       queue.addEventListener('error', e => {
-        console.log('Job err:', e)
-      })
-      queue.addEventListener('end', e => {
-        console.log('Jobs end:', e)
+        console.error('Job err:', e)
       })
       queue.start(err => {
         if (err) console.error(err)
@@ -273,7 +263,6 @@ export function initializeTaskpaneUI() {
       statusElement.textContent = 'Aladdin is ready! No item selected.'
     }
   }
-
   updateEventCountsDisplay()
 }
 
@@ -298,17 +287,9 @@ export function registerItemChangedHandler() {
 // ItemChanged event handler
 export function onItemChanged(eventArgs) {
   console.log('ItemChanged event triggered', eventArgs)
-
   const addinInstance = createAddIn()
   addinInstance.eventCounts.itemChanges++
   const hasItem = addinInstance.Office.context.mailbox && addinInstance.Office.context.mailbox.item
-
-  addinInstance.queue().push(cb => {
-    console.log('Processing item change in shared queue')
-    const result = hasItem ? 'item-changed-with-item' : 'item-changed-no-item'
-    cb(null, result)
-  })
-
   // Update UI
   const statusElement = document.getElementById('status')
   if (statusElement) {
@@ -319,110 +300,56 @@ export function onItemChanged(eventArgs) {
       statusElement.textContent = 'Aladdin is ready! No item selected.'
     }
   }
-
-  addinInstance.start()
   updateEventCountsDisplay()
 }
 
 // Command function for ribbon button
 export function action(event) {
   console.log('Action command executed')
-
   const addinInstance = createAddIn()
   addinInstance.eventCounts.commands++
   addinInstance.globalData.lastAction = new Date().toISOString()
-
-  console.log('Add-in instance is available')
-  console.log('Global data:', addinInstance.globalData)
-
-  addinInstance.queue().push(cb => {
-    console.log('Action queued')
-    const result = 'action-command'
-    cb(null, result)
-  })
-
-  addinInstance.start()
   updateEventCountsDisplay()
-
   event.completed()
 }
 
 // Handler for OnNewMessageCompose event
 export function onNewMessageComposeHandler(event) {
   console.log('OnNewMessageCompose event triggered')
-
   const addinInstance = createAddIn()
   addinInstance.eventCounts.launchEvents++
   addinInstance.globalData.lastEvent = 'OnNewMessageCompose'
-
-  console.log('Shared state accessible in launch event')
-  console.log('Event counts:', addinInstance.eventCounts)
-
-  addinInstance.queue().push(cb => {
-    console.log('OnNewMessageCompose queued')
-    cb(null, 'new-message-compose')
-  })
-
-  addinInstance.start()
   updateEventCountsDisplay()
-
   event.completed()
 }
 
 // Handler for OnMessageSend event
 export function onMessageSendHandler(event) {
   console.log('OnMessageSend event triggered')
-
   const addinInstance = createAddIn()
   addinInstance.eventCounts.launchEvents++
   addinInstance.globalData.lastEvent = 'OnMessageSend'
-
-  addinInstance.queue().push(cb => {
-    console.log('OnMessageSend queued')
-    cb(null, 'message-send')
-  })
-
-  addinInstance.start()
   updateEventCountsDisplay()
-
   event.completed({ allowEvent: true })
 }
 
 // Handler for OnMessageRecipientsChanged event
 export function onRecipientsChangedHandler(event) {
   console.log('OnMessageRecipientsChanged event triggered')
-
   const addinInstance = createAddIn()
   addinInstance.eventCounts.launchEvents++
   addinInstance.globalData.lastEvent = 'OnMessageRecipientsChanged'
-
-  addinInstance.queue().push(cb => {
-    console.log('OnRecipientsChanged queued')
-    cb(null, 'recipients-changed')
-  })
-
-  addinInstance.start()
   updateEventCountsDisplay()
-
   event.completed()
 }
 
 // Handler for OnMessageFromChanged event
 export function onFromChangedHandler(event) {
   console.log('OnMessageFromChanged event triggered')
-
   const addinInstance = createAddIn()
   addinInstance.eventCounts.launchEvents++
   addinInstance.globalData.lastEvent = 'OnMessageFromChanged'
-
-  addinInstance.queue().push(cb => {
-    console.log('OnFromChanged queued')
-    cb(null, 'from-changed')
-  })
-
-  addinInstance.start()
   updateEventCountsDisplay()
-
   event.completed()
 }
 
