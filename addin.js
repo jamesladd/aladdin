@@ -1,14 +1,22 @@
 // addin.js
 
 const singleton = [false]
+const STATE_KEY = 'aladdin-addin-state'
 
 export function createAddIn(Office) {
-  if (typeof window !== 'undefined' && window.aladdinInstance) return window.aladdinInstance;
-  if (singleton[0]) return singleton[0];
+  if (typeof window !== 'undefined' && window.aladdinInstance) {
+    window.aladdinInstance.loadState()
+    return window.aladdinInstance;
+  }
+  if (singleton[0]) {
+    singleton[0].loadState()
+    return singleton[0];
+  }
   const queue = new Queue()
   const instance = addin(queue, Office)
   if (typeof window !== 'undefined') window.aladdinInstance = instance;
   if (typeof window === 'undefined') singleton[0] = instance;
+  instance.loadState()
   return instance
 }
 
@@ -29,11 +37,51 @@ function addin(queue, Office) {
       })
     },
     Office,
-    globalData: {},
-    eventCounts: {
-      commands: 0,
-      launchEvents: 0,
-      itemChanges: 0
+    _state: {
+      globalData: {},
+      eventCounts: {
+        commands: 0,
+        launchEvents: 0,
+        itemChanges: 0
+      }
+    },
+    state() {
+      return this._state
+    },
+    saveState() {
+      if (typeof localStorage !== 'undefined') {
+        try {
+          const stateJson = JSON.stringify(this._state)
+          localStorage.setItem(STATE_KEY, stateJson)
+          console.log('State saved to localStorage')
+        } catch (error) {
+          console.error('Error saving state to localStorage:', error)
+        }
+      } else {
+        console.warn('localStorage not available')
+      }
+    },
+    loadState() {
+      if (typeof localStorage !== 'undefined') {
+        try {
+          const stateJson = localStorage.getItem(STATE_KEY)
+          if (stateJson) {
+            this._state = JSON.parse(stateJson)
+            console.log('State loaded from localStorage:', this._state)
+          } else {
+            console.log('No saved state found in localStorage')
+          }
+        } catch (error) {
+          console.error('Error loading state from localStorage:', error)
+        }
+      } else {
+        console.warn('localStorage not available')
+      }
+    },
+    changeState(changes) {
+      if (changes.eventCounts) Object.assign(this._state.eventCounts, changes.eventCounts);
+      if (changes.globalData) Object.assign(this._state.globalData, changes.globalData);
+      this.saveState()
     }
   }
 }
@@ -246,12 +294,13 @@ export class Queue extends EventTarget {
 // Update event counts display in UI
 export function updateEventCountsDisplay() {
   const addinInstance = createAddIn()
+  const state = addinInstance.state()
   const countsElement = document.getElementById('eventCounts')
   if (countsElement) {
-    countsElement.textContent = `Commands: ${addinInstance.eventCounts.commands}, ` +
-      `Launch Events: ${addinInstance.eventCounts.launchEvents}, ` +
-      `Item Changes: ${addinInstance.eventCounts.itemChanges}`
-    console.log('Global Data', addinInstance.globalData)
+    countsElement.textContent = `Commands: ${state.eventCounts.commands}, ` +
+      `Launch Events: ${state.eventCounts.launchEvents}, ` +
+      `Item Changes: ${state.eventCounts.itemChanges}`
+    console.log('Global Data', state.globalData)
   }
 }
 
@@ -287,7 +336,11 @@ export function showAsTaskpane() {
   return addinInstance.Office.addin.showAsTaskpane()
     .then(() => {
       console.log('Taskpane shown successfully')
-      addinInstance.globalData.lastTaskpaneShow = new Date().toISOString()
+      addinInstance.changeState({
+        globalData: {
+          lastTaskpaneShow: new Date().toISOString()
+        }
+      })
       return true
     })
     .catch(error => {
@@ -318,7 +371,13 @@ export function registerItemChangedHandler() {
 export function onItemChanged(eventArgs) {
   console.log('ItemChanged event triggered', eventArgs)
   const addinInstance = createAddIn()
-  addinInstance.eventCounts.itemChanges++
+  const state = addinInstance.state()
+  addinInstance.changeState({
+    eventCounts: {
+      itemChanges: state.eventCounts.itemChanges + 1
+    }
+  })
+
   const hasItem = addinInstance.Office.context.mailbox && addinInstance.Office.context.mailbox.item
   // Update UI
   const statusElement = document.getElementById('status')
@@ -382,8 +441,12 @@ function registerDocumentVisibilityHandler() {
 export function onVisibilityChanged(args) {
   console.log('Office VisibilityChanged event triggered', args)
   const addinInstance = createAddIn()
-  addinInstance.globalData.lastVisibilityMode = args.visibilityMode
-  addinInstance.globalData.lastVisibilityChange = new Date().toISOString()
+  addinInstance.changeState({
+    globalData: {
+      lastVisibilityMode: args.visibilityMode,
+      lastVisibilityChange: new Date().toISOString()
+    }
+  })
 
   const statusElement = document.getElementById('status')
   if (statusElement) {
@@ -401,8 +464,13 @@ function onDocumentVisibilityChanged() {
   const isHidden = document.hidden
 
   console.log('Document visibility changed, hidden:', isHidden)
-  addinInstance.globalData.lastVisibilityState = isHidden ? 'hidden' : 'visible'
-  addinInstance.globalData.lastVisibilityChange = new Date().toISOString()
+
+  addinInstance.changeState({
+    globalData: {
+      lastVisibilityState: isHidden ? 'hidden' : 'visible',
+      lastVisibilityChange: new Date().toISOString()
+    }
+  })
 
   const statusElement = document.getElementById('status')
   if (statusElement) {
@@ -416,8 +484,16 @@ function onDocumentVisibilityChanged() {
 export function action(event) {
   console.log('Action command executed')
   const addinInstance = createAddIn()
-  addinInstance.eventCounts.commands++
-  addinInstance.globalData.lastAction = new Date().toISOString()
+  const state = addinInstance.state()
+  addinInstance.changeState({
+    eventCounts: {
+      commands: state.eventCounts.commands + 1
+    },
+    globalData: {
+      lastAction: new Date().toISOString()
+    }
+  })
+
   updateEventCountsDisplay()
   event.completed()
 }
@@ -426,8 +502,15 @@ export function action(event) {
 export function onNewMessageComposeHandler(event) {
   console.log('OnNewMessageCompose event triggered')
   const addinInstance = createAddIn()
-  addinInstance.eventCounts.launchEvents++
-  addinInstance.globalData.lastEvent = 'OnNewMessageCompose'
+  const state = addinInstance.state()
+  addinInstance.changeState({
+    eventCounts: {
+      launchEvents: state.eventCounts.launchEvents + 1
+    },
+    globalData: {
+      lastEvent: 'OnNewMessageCompose'
+    }
+  })
 
   // Show taskpane when new message is composed
   showAsTaskpane()
@@ -446,8 +529,16 @@ export function onNewMessageComposeHandler(event) {
 export function onMessageSendHandler(event) {
   console.log('OnMessageSend event triggered')
   const addinInstance = createAddIn()
-  addinInstance.eventCounts.launchEvents++
-  addinInstance.globalData.lastEvent = 'OnMessageSend'
+  const state = addinInstance.state()
+  addinInstance.changeState({
+    eventCounts: {
+      launchEvents: state.eventCounts.launchEvents + 1
+    },
+    globalData: {
+      lastEvent: 'OnMessageSend'
+    }
+  })
+
   updateEventCountsDisplay()
   event.completed({ allowEvent: true })
 }
@@ -456,8 +547,16 @@ export function onMessageSendHandler(event) {
 export function onRecipientsChangedHandler(event) {
   console.log('OnMessageRecipientsChanged event triggered')
   const addinInstance = createAddIn()
-  addinInstance.eventCounts.launchEvents++
-  addinInstance.globalData.lastEvent = 'OnMessageRecipientsChanged'
+  const state = addinInstance.state()
+  addinInstance.changeState({
+    eventCounts: {
+      launchEvents: state.eventCounts.launchEvents + 1
+    },
+    globalData: {
+      lastEvent: 'OnMessageRecipientsChanged'
+    }
+  })
+
   updateEventCountsDisplay()
   event.completed()
 }
@@ -466,8 +565,16 @@ export function onRecipientsChangedHandler(event) {
 export function onFromChangedHandler(event) {
   console.log('OnMessageFromChanged event triggered')
   const addinInstance = createAddIn()
-  addinInstance.eventCounts.launchEvents++
-  addinInstance.globalData.lastEvent = 'OnMessageFromChanged'
+  const state = addinInstance.state()
+  addinInstance.changeState({
+    eventCounts: {
+      launchEvents: state.eventCounts.launchEvents + 1
+    },
+    globalData: {
+      lastEvent: 'OnMessageFromChanged'
+    }
+  })
+
   updateEventCountsDisplay()
   event.completed()
 }
