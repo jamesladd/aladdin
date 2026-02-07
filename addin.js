@@ -4,14 +4,8 @@ const singleton = [false]
 const STATE_KEY = 'aladdin-addin-state'
 
 export function createAddIn(Office) {
-  if (typeof window !== 'undefined' && window.aladdinInstance) {
-    window.aladdinInstance.loadState()
-    return window.aladdinInstance;
-  }
-  if (singleton[0]) {
-    singleton[0].loadState()
-    return singleton[0];
-  }
+  if (typeof window !== 'undefined' && window.aladdinInstance) return window.aladdinInstance;
+  if (singleton[0]) return singleton[0];
   const queue = new Queue()
   const instance = addin(queue, Office)
   if (typeof window !== 'undefined') window.aladdinInstance = instance;
@@ -26,9 +20,9 @@ function addin(queue, Office) {
       return queue
     },
     start() {
-      queue.addEventListener('success', e => {
-        console.log('Job ok:', JSON.stringify(e.detail, null, 2))
-      })
+      // queue.addEventListener('success', e => {
+      //   console.log('Job ok:', JSON.stringify(e.detail, null, 2))
+      // })
       queue.addEventListener('error', e => {
         console.error('Job err:', e)
       })
@@ -53,7 +47,6 @@ function addin(queue, Office) {
         try {
           const stateJson = JSON.stringify(this._state)
           localStorage.setItem(STATE_KEY, stateJson)
-          console.log('State saved to localStorage')
         } catch (error) {
           console.error('Error saving state to localStorage:', error)
         }
@@ -65,12 +58,7 @@ function addin(queue, Office) {
       if (typeof localStorage !== 'undefined') {
         try {
           const stateJson = localStorage.getItem(STATE_KEY)
-          if (stateJson) {
-            this._state = JSON.parse(stateJson)
-            console.log('State loaded from localStorage:', this._state)
-          } else {
-            console.log('No saved state found in localStorage')
-          }
+          if (stateJson) this._state = JSON.parse(stateJson);
         } catch (error) {
           console.error('Error loading state from localStorage:', error)
         }
