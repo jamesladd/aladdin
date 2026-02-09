@@ -3,7 +3,7 @@
 const singleton = [false]
 const STATE_KEY = 'aladdin-addin-state'
 const MAX_ITEM_HISTORY = 10
-const AUTO_CHECK_INTERVAL = 3000 // 3 seconds
+const AUTO_CHECK_INTERVAL = 2000
 
 export function createAddIn(Office) {
   if (typeof window !== 'undefined' && window.aladdinInstance) return window.aladdinInstance;
@@ -582,6 +582,16 @@ export function compareItemSnapshots(oldSnapshot, newSnapshot) {
     detected: []
   };
 
+  // Check if the itemId itself has changed (indicates move/copy)
+  if (oldSnapshot.itemId !== newSnapshot.itemId) {
+    changes.detected.push({
+      type: 'itemId',
+      old: oldSnapshot.itemId,
+      new: newSnapshot.itemId,
+      description: 'Item ID changed - item may have been moved, copied, or modified'
+    });
+  }
+
   // Check category changes
   const oldCategories = (oldSnapshot.categories || []).sort().join(',');
   const newCategories = (newSnapshot.categories || []).sort().join(',');
@@ -598,7 +608,8 @@ export function compareItemSnapshots(oldSnapshot, newSnapshot) {
     changes.detected.push({
       type: 'folder',
       old: String(oldSnapshot.folderId),
-      new: String(newSnapshot.folderId)
+      new: String(newSnapshot.folderId),
+      description: 'Item moved to different folder'
     });
   }
 
@@ -661,6 +672,22 @@ export function compareItemSnapshots(oldSnapshot, newSnapshot) {
   return changes.detected.length > 0 ? changes : null;
 }
 
+// Detect if previous item was possibly deleted or moved
+export function detectPossibleDeletion(previousItem, newItem) {
+  // If we had an item before, but now we don't, it might have been deleted
+  if (previousItem && !newItem) {
+    return {
+      type: 'possibleDeletion',
+      previousSubject: previousItem.subject,
+      previousItemId: previousItem.itemId,
+      previousCategories: previousItem.categories || [],
+      timestamp: new Date().toISOString(),
+      description: 'Previous item is no longer selected - may have been deleted, moved, or archived'
+    };
+  }
+  return null;
+}
+
 // Display detected item changes in UI
 export function displayItemChanges(changes) {
   const changesElement = document.getElementById('itemChanges');
@@ -679,6 +706,30 @@ export function displayItemChanges(changes) {
       <pre style="white-space: pre-wrap; word-wrap: break-word; font-size: 12px; margin: 5px 0;">${JSON.stringify(change, null, 2)}</pre>
     </div>`;
   });
+
+  changesElement.innerHTML = html;
+}
+
+// Display possible deletion in UI
+export function displayPossibleDeletion(deletionInfo) {
+  const changesElement = document.getElementById('itemChanges');
+  if (!changesElement) return;
+
+  let html = '<div class="changes-header" style="color: #d9534f;">Possible Item Deletion/Move Detected</div>';
+  html += `<div class="change-item" style="border-left-color: #d9534f;">
+    <strong>Previous Item No Longer Selected</strong><br>
+    <pre style="white-space: pre-wrap; word-wrap: break-word; font-size: 12px; margin: 5px 0;">${JSON.stringify(deletionInfo, null, 2)}</pre>
+    <div style="margin-top: 10px; padding: 8px; background-color: #f8d7da; border-radius: 4px; font-size: 11px;">
+      <strong>Note:</strong> The item may have been:
+      <ul style="margin: 5px 0; padding-left: 20px;">
+        <li>Deleted</li>
+        <li>Moved to another folder (Deleted Items, Archive, etc.)</li>
+        <li>Moved to a different mailbox</li>
+        <li>Selection cleared without action</li>
+      </ul>
+      Due to Office.js API limitations, we cannot determine the exact action that was taken.
+    </div>
+  </div>`;
 
   changesElement.innerHTML = html;
 }
@@ -752,7 +803,7 @@ export function checkCurrentItemForChanges() {
       // Only show "no changes" if there are no previous changes displayed
       const changesElement = document.getElementById('itemChanges');
       if (changesElement && (!changesElement.innerHTML || changesElement.innerHTML.includes('First time'))) {
-        changesElement.innerHTML = '<div class="info-message">No changes detected (checked just now)</div>';
+        changesElement.innerHTML = '<div class="info-message">No changes detected (auto-checked)</div>';
       }
 
       updateEventCountsDisplay();
@@ -900,10 +951,8 @@ function registerMultiEventListeners() {
 
   // Window blur event
   const blurHandler = () => {
-    console.log('Window lost focus, stopping auto-check');
-    const addinInstance = createAddIn();
-    // Stop auto-check when not focused (optional - can remove if you want it to always run)
-    // addinInstance.stopAutoCheck();
+    console.log('Window lost focus');
+    // Keep timer running even when not focused (for testing)
   };
   window.addEventListener('blur', blurHandler);
   eventListeners.push({ target: window, event: 'blur', handler: blurHandler });
@@ -1006,12 +1055,17 @@ export function onItemChanged(eventArgs) {
     }
   });
 
+  // Stop auto-check timer during transition
+  addinInstance.stopAutoCheck();
+
   // STEP 1: Check if we have a previous item
   const previousItem = state.currentItem;
   const lastChecked = state.lastCheckedSnapshot;
 
   if (previousItem && lastChecked) {
     console.log('Previous item detected, comparing snapshots');
+    console.log('Previous item:', previousItem.subject, '(ID:', previousItem.itemId + ')');
+    console.log('Last checked:', lastChecked.subject, '(ID:', lastChecked.itemId + ')');
 
     // Compare the initial snapshot with the last checked snapshot
     const changes = compareItemSnapshots(previousItem, lastChecked);
@@ -1022,13 +1076,14 @@ export function onItemChanged(eventArgs) {
       // Store detected changes
       addinInstance.changeState({
         globalData: {
-          lastItemChanges: changes
+          lastItemChanges: changes,
+          lastItemChangedFrom: previousItem.subject
         }
       });
 
       // Store the final state in history (with limit)
       const updatedHistory = { ...state.itemHistory };
-      updatedHistory[previousItem.itemId] = lastChecked;
+      updatedHistory[lastChecked.itemId] = lastChecked;
       const limitedHistory = limitItemHistory(updatedHistory);
 
       addinInstance.changeState({
@@ -1042,17 +1097,17 @@ export function onItemChanged(eventArgs) {
 
       // Store snapshot in history (with limit)
       const updatedHistory = { ...state.itemHistory };
-      updatedHistory[previousItem.itemId] = lastChecked;
+      updatedHistory[lastChecked.itemId] = lastChecked;
       const limitedHistory = limitItemHistory(updatedHistory);
 
       addinInstance.changeState({
         itemHistory: limitedHistory
       });
 
-      // Clear changes display
+      // Show info message
       const changesElement = document.getElementById('itemChanges');
       if (changesElement) {
-        changesElement.innerHTML = '<div class="info-message">No changes detected in previous item</div>';
+        changesElement.innerHTML = `<div class="info-message">No changes detected in previous item: "${previousItem.subject}"</div>`;
       }
     }
   } else {
@@ -1071,6 +1126,7 @@ export function onItemChanged(eventArgs) {
       }
 
       console.log('New item snapshot captured:', newSnapshot);
+      console.log('New item:', newSnapshot.subject, '(ID:', newSnapshot.itemId + ')');
 
       // Store as both current item and last checked (they start the same)
       addinInstance.changeState({
@@ -1079,7 +1135,7 @@ export function onItemChanged(eventArgs) {
       });
 
       // Update UI with current item
-      const subject = newItem.subject || 'No subject';
+      const subject = newSnapshot.subject || 'No subject';
       const statusElement = document.getElementById('status');
       if (statusElement) {
         statusElement.textContent = `Item: ${subject}`;
@@ -1093,25 +1149,32 @@ export function onItemChanged(eventArgs) {
   } else {
     console.log('No new item selected');
 
+    // Detect possible deletion
+    const deletionInfo = detectPossibleDeletion(previousItem, null);
+    if (deletionInfo) {
+      console.log('Possible deletion/move detected:', deletionInfo);
+
+      // Display deletion info in UI
+      displayPossibleDeletion(deletionInfo);
+
+      // Store deletion info
+      addinInstance.changeState({
+        globalData: {
+          lastDeletionInfo: deletionInfo
+        }
+      });
+    }
+
     // Clear current item
     addinInstance.changeState({
       currentItem: null,
       lastCheckedSnapshot: null
     });
 
-    // Stop auto-check when no item
-    addinInstance.stopAutoCheck();
-
     const platform = isDesktop() ? 'Desktop' : 'Web';
     const statusElement = document.getElementById('status');
     if (statusElement) {
       statusElement.textContent = `Aladdin is ready on ${platform}! No item selected.`;
-    }
-
-    // Clear changes display
-    const changesElement = document.getElementById('itemChanges');
-    if (changesElement) {
-      changesElement.innerHTML = '';
     }
   }
 
