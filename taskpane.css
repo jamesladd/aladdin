@@ -107,3 +107,12 @@ h1 {
     font-size: 13px;
     color: #856404;
 }
+
+.change-item pre {
+    background-color: #f5f5f5;
+    padding: 10px;
+    border-radius: 4px;
+    overflow-x: auto;
+    max-height: 300px;
+    overflow-y: auto;
+}

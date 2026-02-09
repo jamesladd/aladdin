@@ -712,76 +712,10 @@ export function displayItemChanges(changes) {
   let html = '<div class="changes-header">Changes Detected:</div>';
 
   changes.detected.forEach(change => {
-    switch(change.type) {
-      case 'categories':
-        html += `<div class="change-item">
-          <strong>Categories:</strong><br>
-          Old: ${change.old.join(', ') || '(none)'}<br>
-          New: ${change.new.join(', ') || '(none)'}
-        </div>`;
-        break;
-
-      case 'folder':
-        html += `<div class="change-item">
-          <strong>Folder Changed</strong><br>
-          Item was moved to a different folder<br>
-          Old: ${change.old}<br>
-          New: ${change.new}
-        </div>`;
-        break;
-
-      case 'itemClass':
-        html += `<div class="change-item">
-          <strong>Item Class Changed</strong><br>
-          Old: ${change.old}<br>
-          New: ${change.new}
-        </div>`;
-        break;
-
-      case 'from':
-        const oldFromDisplay = change.oldDisplay || change.oldEmail || '(none)';
-        const newFromDisplay = change.newDisplay || change.newEmail || '(none)';
-        html += `<div class="change-item">
-          <strong>From:</strong><br>
-          Old: ${oldFromDisplay} ${change.oldEmail ? `&lt;${change.oldEmail}&gt;` : ''}<br>
-          New: ${newFromDisplay} ${change.newEmail ? `&lt;${change.newEmail}&gt;` : ''}
-        </div>`;
-        break;
-
-      case 'to':
-        const oldToDisplay = change.oldList.length > 0
-          ? change.oldList.map(r => `${r.name || r.email} ${r.name ? `&lt;${r.email}&gt;` : ''}`).join(', ')
-          : '(none)';
-        const newToDisplay = change.newList.length > 0
-          ? change.newList.map(r => `${r.name || r.email} ${r.name ? `&lt;${r.email}&gt;` : ''}`).join(', ')
-          : '(none)';
-        html += `<div class="change-item">
-          <strong>To Recipients:</strong><br>
-          Old: ${oldToDisplay}<br>
-          New: ${newToDisplay}
-        </div>`;
-        break;
-
-      case 'cc':
-        const oldCcDisplay = change.oldList.length > 0
-          ? change.oldList.map(r => `${r.name || r.email} ${r.name ? `&lt;${r.email}&gt;` : ''}`).join(', ')
-          : '(none)';
-        const newCcDisplay = change.newList.length > 0
-          ? change.newList.map(r => `${r.name || r.email} ${r.name ? `&lt;${r.email}&gt;` : ''}`).join(', ')
-          : '(none)';
-        html += `<div class="change-item">
-          <strong>CC Recipients:</strong><br>
-          Old: ${oldCcDisplay}<br>
-          New: ${newCcDisplay}
-        </div>`;
-        break;
-
-      default:
-        html += `<div class="change-item">
-          <strong>Unknown Change Type: ${change.type}</strong><br>
-          <pre>${JSON.stringify(change, null, 2)}</pre>
-        </div>`;
-    }
+    html += `<div class="change-item">
+      <strong>Change Type: ${change.type}</strong><br>
+      <pre style="white-space: pre-wrap; word-wrap: break-word; font-size: 12px; margin: 5px 0;">${JSON.stringify(change, null, 2)}</pre>
+    </div>`;
   });
 
   changesElement.innerHTML = html;
