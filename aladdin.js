@@ -690,22 +690,31 @@ export function displayItemChanges(changes) {
   const changesElement = document.getElementById('itemChanges');
   if (!changesElement) return;
 
+  if (!changes || !changes.detected || changes.detected.length === 0) {
+    changesElement.innerHTML = '<div class="info-message">No changes detected</div>';
+    return;
+  }
+
   let html = '<div class="changes-header">Changes Detected:</div>';
 
   changes.detected.forEach(change => {
     switch(change.type) {
       case 'categories':
+        const oldCats = Array.isArray(change.old) ? change.old.join(', ') : JSON.stringify(change.old);
+        const newCats = Array.isArray(change.new) ? change.new.join(', ') : JSON.stringify(change.new);
         html += `<div class="change-item">
           <strong>Categories:</strong><br>
-          Old: ${change.old.join(', ') || '(none)'}<br>
-          New: ${change.new.join(', ') || '(none)'}
+          Old: ${oldCats || '(none)'}<br>
+          New: ${newCats || '(none)'}
         </div>`;
         break;
 
       case 'folder':
         html += `<div class="change-item">
           <strong>Folder Changed</strong><br>
-          Item was moved to a different folder
+          Item was moved to a different folder<br>
+          Old: ${change.old || '(unknown)'}<br>
+          New: ${change.new || '(unknown)'}
         </div>`;
         break;
 
@@ -718,28 +727,52 @@ export function displayItemChanges(changes) {
         break;
 
       case 'from':
+        const oldFromEmail = change.old && typeof change.old === 'object'
+          ? change.old.emailAddress
+          : String(change.old || '(none)');
+        const newFromEmail = change.new && typeof change.new === 'object'
+          ? change.new.emailAddress
+          : String(change.new || '(none)');
         html += `<div class="change-item">
           <strong>From:</strong><br>
-          Old: ${change.old ? change.old.emailAddress : '(none)'}<br>
-          New: ${change.new ? change.new.emailAddress : '(none)'}
+          Old: ${oldFromEmail}<br>
+          New: ${newFromEmail}
         </div>`;
         break;
 
       case 'to':
+        const oldToList = Array.isArray(change.old)
+          ? change.old.map(r => r.emailAddress || String(r)).join(', ')
+          : String(change.old || '(none)');
+        const newToList = Array.isArray(change.new)
+          ? change.new.map(r => r.emailAddress || String(r)).join(', ')
+          : String(change.new || '(none)');
         html += `<div class="change-item">
           <strong>To Recipients:</strong><br>
-          Old: ${change.old.map(r => r.emailAddress).join(', ') || '(none)'}<br>
-          New: ${change.new.map(r => r.emailAddress).join(', ') || '(none)'}
+          Old: ${oldToList || '(none)'}<br>
+          New: ${newToList || '(none)'}
         </div>`;
         break;
 
       case 'cc':
+        const oldCcList = Array.isArray(change.old)
+          ? change.old.map(r => r.emailAddress || String(r)).join(', ')
+          : String(change.old || '(none)');
+        const newCcList = Array.isArray(change.new)
+          ? change.new.map(r => r.emailAddress || String(r)).join(', ')
+          : String(change.new || '(none)');
         html += `<div class="change-item">
           <strong>CC Recipients:</strong><br>
-          Old: ${change.old.map(r => r.emailAddress).join(', ') || '(none)'}<br>
-          New: ${change.new.map(r => r.emailAddress).join(', ') || '(none)'}
+          Old: ${oldCcList || '(none)'}<br>
+          New: ${newCcList || '(none)'}
         </div>`;
         break;
+
+      default:
+        html += `<div class="change-item">
+          <strong>Unknown Change Type: ${change.type}</strong><br>
+          ${JSON.stringify(change, null, 2)}
+        </div>`;
     }
   });
 
@@ -807,11 +840,12 @@ export function checkCurrentItemForChanges() {
         }
       });
 
-      // Show "no changes" message
+      // Only show "no changes" if there are no previous changes displayed
       const changesElement = document.getElementById('itemChanges');
-      if (changesElement) {
-        changesElement.innerHTML = '<div class="info-message">No changes detected</div>';
+      if (changesElement && (!changesElement.innerHTML || changesElement.innerHTML.includes('First time'))) {
+        changesElement.innerHTML = '<div class="info-message">No changes detected (checked just now)</div>';
       }
+      // If there were changes shown before, leave them displayed
 
       updateEventCountsDisplay();
 
@@ -828,7 +862,7 @@ export function debouncedCheckCurrentItem() {
   if (checkDebounceTimer) clearTimeout(checkDebounceTimer);
   checkDebounceTimer = setTimeout(() => {
     checkCurrentItemForChanges();
-  }, 1000);
+  }, 3000);
 }
 
 // Update event counts display in UI
@@ -896,20 +930,6 @@ function registerMultiEventListeners() {
   };
   document.addEventListener('visibilitychange', visibilityHandler);
   eventListeners.push({ target: document, event: 'visibilitychange', handler: visibilityHandler });
-
-  // User clicks in taskpane
-  const clickHandler = () => {
-    debouncedCheckCurrentItem();
-  };
-  document.addEventListener('click', clickHandler);
-  eventListeners.push({ target: document, event: 'click', handler: clickHandler });
-
-  // User presses key in taskpane
-  const keydownHandler = () => {
-    debouncedCheckCurrentItem();
-  };
-  document.addEventListener('keydown', keydownHandler);
-  eventListeners.push({ target: document, event: 'keydown', handler: keydownHandler });
 
   console.log('Multi-event listeners registered');
 }
