@@ -2,6 +2,7 @@
 
 const singleton = [false]
 const STATE_KEY = 'aladdin-addin-state'
+const MAX_ITEM_HISTORY = 10
 
 export function createAddIn(Office) {
   if (typeof window !== 'undefined' && window.aladdinInstance) return window.aladdinInstance;
@@ -37,8 +38,11 @@ function aladdin(queue, Office) {
       eventCounts: {
         commands: 0,
         launchEvents: 0,
-        itemChanges: 0
-      }
+        itemChanges: 0,
+        changeChecks: 0
+      },
+      itemHistory: {}, // Store historical snapshots by itemId (limited to MAX_ITEM_HISTORY)
+      currentItem: null // Store the currently selected item's snapshot
     },
     _storageWatcher: null,
     _pollInterval: null,
@@ -61,7 +65,20 @@ function aladdin(queue, Office) {
       if (typeof localStorage !== 'undefined') {
         try {
           const stateJson = localStorage.getItem(STATE_KEY)
-          if (stateJson) this._state = JSON.parse(stateJson);
+          if (stateJson) {
+            const loadedState = JSON.parse(stateJson)
+            // Ensure itemHistory and currentItem exist even in old saved states
+            if (!loadedState.itemHistory) {
+              loadedState.itemHistory = {}
+            }
+            if (!loadedState.currentItem) {
+              loadedState.currentItem = null
+            }
+            if (!loadedState.eventCounts.changeChecks) {
+              loadedState.eventCounts.changeChecks = 0
+            }
+            this._state = loadedState
+          }
         } catch (error) {
           console.error('Error loading state from localStorage:', error)
         }
@@ -72,6 +89,8 @@ function aladdin(queue, Office) {
     changeState(changes) {
       if (changes.eventCounts) Object.assign(this._state.eventCounts, changes.eventCounts);
       if (changes.globalData) Object.assign(this._state.globalData, changes.globalData);
+      if (changes.itemHistory) Object.assign(this._state.itemHistory, changes.itemHistory);
+      if (changes.hasOwnProperty('currentItem')) this._state.currentItem = changes.currentItem;
       this.saveState()
     },
     watchStorage() {
@@ -130,6 +149,7 @@ function aladdin(queue, Office) {
     cleanup() {
       this.unwatchStorage()
       this.queue().stop()
+      cleanupEventListeners()
     }
   }
 }
@@ -339,6 +359,437 @@ export class Queue extends EventTarget {
   }
 }
 
+// Platform detection
+export function isDesktop() {
+  if (typeof Office === 'undefined') return false
+
+  // Check if running in desktop Outlook
+  const isDesktopPlatform = Office.context?.platform === Office.PlatformType.PC ||
+    Office.context?.platform === Office.PlatformType.Mac
+
+  // Desktop typically doesn't have Office.addin or has limited support
+  const hasFullAddinAPI = typeof Office.addin !== 'undefined' &&
+    typeof Office.addin.showAsTaskpane === 'function'
+
+  return isDesktopPlatform || !hasFullAddinAPI
+}
+
+// Limit itemHistory to MAX_ITEM_HISTORY items (keep most recent)
+function limitItemHistory(itemHistory) {
+  const entries = Object.entries(itemHistory);
+
+  if (entries.length <= MAX_ITEM_HISTORY) {
+    return itemHistory;
+  }
+
+  // Sort by timestamp (most recent first)
+  entries.sort((a, b) => {
+    const timeA = new Date(a[1].timestamp).getTime();
+    const timeB = new Date(b[1].timestamp).getTime();
+    return timeB - timeA;
+  });
+
+  // Keep only the most recent MAX_ITEM_HISTORY items
+  const limitedEntries = entries.slice(0, MAX_ITEM_HISTORY);
+
+  return Object.fromEntries(limitedEntries);
+}
+
+// Capture a snapshot of current email item
+export function captureItemSnapshot(item) {
+  if (!item) return Promise.resolve(null);
+
+  return new Promise((resolve) => {
+    const snapshot = {
+      itemId: item.itemId,
+      conversationId: item.conversationId,
+      subject: item.subject || '',
+      timestamp: new Date().toISOString()
+    };
+
+    // Capture categories
+    item.categories.getAsync((result) => {
+      if (result.status === Office.AsyncResultStatus.Succeeded) {
+        snapshot.categories = result.value || [];
+      } else {
+        snapshot.categories = [];
+      }
+
+      // Capture item class (gives context about item type and location)
+      snapshot.itemClass = item.itemClass || '';
+
+      // Try to get folder information if available (limited API support)
+      if (item.getItemIdAsync) {
+        item.getItemIdAsync((folderResult) => {
+          if (folderResult.status === Office.AsyncResultStatus.Succeeded) {
+            snapshot.folderId = folderResult.value;
+          }
+          continueCapture();
+        });
+      } else {
+        continueCapture();
+      }
+
+      function continueCapture() {
+        // Capture from address
+        if (item.from) {
+          snapshot.from = {
+            displayName: item.from.displayName || '',
+            emailAddress: item.from.emailAddress || ''
+          };
+        }
+
+        // Capture to recipients
+        if (item.to) {
+          item.to.getAsync((toResult) => {
+            if (toResult.status === Office.AsyncResultStatus.Succeeded) {
+              snapshot.to = toResult.value.map(r => ({
+                displayName: r.displayName || '',
+                emailAddress: r.emailAddress || ''
+              }));
+            } else {
+              snapshot.to = [];
+            }
+
+            // Capture cc recipients
+            if (item.cc) {
+              item.cc.getAsync((ccResult) => {
+                if (ccResult.status === Office.AsyncResultStatus.Succeeded) {
+                  snapshot.cc = ccResult.value.map(r => ({
+                    displayName: r.displayName || '',
+                    emailAddress: r.emailAddress || ''
+                  }));
+                } else {
+                  snapshot.cc = [];
+                }
+                resolve(snapshot);
+              });
+            } else {
+              snapshot.cc = [];
+              resolve(snapshot);
+            }
+          });
+        } else {
+          snapshot.to = [];
+          snapshot.cc = [];
+          resolve(snapshot);
+        }
+      }
+    });
+  });
+}
+
+// Re-read an item using REST API to get current state
+export function rereadItemSnapshot(itemId, Office) {
+  return new Promise((resolve, reject) => {
+    // Office.js doesn't provide a direct way to read an item by ID when it's not selected
+    // We need to use REST API or EWS
+
+    // Get access token for REST API
+    Office.context.mailbox.getCallbackTokenAsync({ isRest: true }, (result) => {
+      if (result.status !== Office.AsyncResultStatus.Succeeded) {
+        console.error('Failed to get access token for REST API:', result.error);
+        reject(new Error('Failed to get access token'));
+        return;
+      }
+
+      const accessToken = result.value;
+      const restUrl = Office.context.mailbox.restUrl;
+
+      // Convert itemId to REST format
+      const restId = Office.context.mailbox.convertToRestId(
+        itemId,
+        Office.MailboxEnums.RestVersion.v2_0
+      );
+
+      // Construct the REST API URL
+      const getMessageUrl = `${restUrl}/v2.0/me/messages/${restId}?$select=subject,categories,from,toRecipients,ccRecipients,parentFolderId,itemClass`;
+
+      // Make REST API call
+      fetch(getMessageUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': 'Bearer ' + accessToken,
+          'Content-Type': 'application/json'
+        }
+      })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`REST API returned ${response.status}: ${response.statusText}`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          // Convert REST API response to our snapshot format
+          const snapshot = {
+            itemId: itemId,
+            conversationId: data.conversationId || '',
+            subject: data.subject || '',
+            categories: data.categories || [],
+            itemClass: data.itemClass || '',
+            folderId: data.parentFolderId || '',
+            timestamp: new Date().toISOString()
+          };
+
+          // Convert from address
+          if (data.from && data.from.emailAddress) {
+            snapshot.from = {
+              displayName: data.from.emailAddress.name || '',
+              emailAddress: data.from.emailAddress.address || ''
+            };
+          }
+
+          // Convert to recipients
+          if (data.toRecipients) {
+            snapshot.to = data.toRecipients.map(r => ({
+              displayName: r.emailAddress.name || '',
+              emailAddress: r.emailAddress.address || ''
+            }));
+          } else {
+            snapshot.to = [];
+          }
+
+          // Convert cc recipients
+          if (data.ccRecipients) {
+            snapshot.cc = data.ccRecipients.map(r => ({
+              displayName: r.emailAddress.name || '',
+              emailAddress: r.emailAddress.address || ''
+            }));
+          } else {
+            snapshot.cc = [];
+          }
+
+          resolve(snapshot);
+        })
+        .catch(error => {
+          console.error('Error fetching item via REST API:', error);
+          reject(error);
+        });
+    });
+  });
+}
+
+// Compare two item snapshots and return detected changes
+export function compareItemSnapshots(oldSnapshot, newSnapshot) {
+  if (!oldSnapshot || !newSnapshot) return null;
+
+  const changes = {
+    itemId: newSnapshot.itemId,
+    timestamp: new Date().toISOString(),
+    detected: []
+  };
+
+  // Check category changes
+  const oldCategories = (oldSnapshot.categories || []).sort().join(',');
+  const newCategories = (newSnapshot.categories || []).sort().join(',');
+  if (oldCategories !== newCategories) {
+    changes.detected.push({
+      type: 'categories',
+      old: oldSnapshot.categories || [],
+      new: newSnapshot.categories || []
+    });
+  }
+
+  // Check folder/location changes (using folderId)
+  if (oldSnapshot.folderId !== newSnapshot.folderId && oldSnapshot.folderId && newSnapshot.folderId) {
+    changes.detected.push({
+      type: 'folder',
+      old: oldSnapshot.folderId,
+      new: newSnapshot.folderId
+    });
+  }
+
+  // Also check itemClass changes (can indicate moves or type changes)
+  if (oldSnapshot.itemClass !== newSnapshot.itemClass) {
+    changes.detected.push({
+      type: 'itemClass',
+      old: oldSnapshot.itemClass,
+      new: newSnapshot.itemClass
+    });
+  }
+
+  // Check from address changes
+  const oldFrom = oldSnapshot.from ? oldSnapshot.from.emailAddress : '';
+  const newFrom = newSnapshot.from ? newSnapshot.from.emailAddress : '';
+  if (oldFrom !== newFrom) {
+    changes.detected.push({
+      type: 'from',
+      old: oldSnapshot.from,
+      new: newSnapshot.from
+    });
+  }
+
+  // Check to recipients changes
+  const oldTo = (oldSnapshot.to || []).map(r => r.emailAddress).sort().join(',');
+  const newTo = (newSnapshot.to || []).map(r => r.emailAddress).sort().join(',');
+  if (oldTo !== newTo) {
+    changes.detected.push({
+      type: 'to',
+      old: oldSnapshot.to || [],
+      new: newSnapshot.to || []
+    });
+  }
+
+  // Check cc recipients changes
+  const oldCc = (oldSnapshot.cc || []).map(r => r.emailAddress).sort().join(',');
+  const newCc = (newSnapshot.cc || []).map(r => r.emailAddress).sort().join(',');
+  if (oldCc !== newCc) {
+    changes.detected.push({
+      type: 'cc',
+      old: oldSnapshot.cc || [],
+      new: newSnapshot.cc || []
+    });
+  }
+
+  return changes.detected.length > 0 ? changes : null;
+}
+
+// Display detected item changes in UI
+export function displayItemChanges(changes) {
+  const changesElement = document.getElementById('itemChanges');
+  if (!changesElement) return;
+
+  let html = '<div class="changes-header">Changes Detected:</div>';
+
+  changes.detected.forEach(change => {
+    switch(change.type) {
+      case 'categories':
+        html += `<div class="change-item">
+          <strong>Categories:</strong><br>
+          Old: ${change.old.join(', ') || '(none)'}<br>
+          New: ${change.new.join(', ') || '(none)'}
+        </div>`;
+        break;
+
+      case 'folder':
+        html += `<div class="change-item">
+          <strong>Folder Changed</strong><br>
+          Item was moved to a different folder
+        </div>`;
+        break;
+
+      case 'itemClass':
+        html += `<div class="change-item">
+          <strong>Item Class Changed</strong><br>
+          Old: ${change.old || '(unknown)'}<br>
+          New: ${change.new || '(unknown)'}
+        </div>`;
+        break;
+
+      case 'from':
+        html += `<div class="change-item">
+          <strong>From:</strong><br>
+          Old: ${change.old ? change.old.emailAddress : '(none)'}<br>
+          New: ${change.new ? change.new.emailAddress : '(none)'}
+        </div>`;
+        break;
+
+      case 'to':
+        html += `<div class="change-item">
+          <strong>To Recipients:</strong><br>
+          Old: ${change.old.map(r => r.emailAddress).join(', ') || '(none)'}<br>
+          New: ${change.new.map(r => r.emailAddress).join(', ') || '(none)'}
+        </div>`;
+        break;
+
+      case 'cc':
+        html += `<div class="change-item">
+          <strong>CC Recipients:</strong><br>
+          Old: ${change.old.map(r => r.emailAddress).join(', ') || '(none)'}<br>
+          New: ${change.new.map(r => r.emailAddress).join(', ') || '(none)'}
+        </div>`;
+        break;
+    }
+  });
+
+  changesElement.innerHTML = html;
+}
+
+// Debounce timer for change checks
+let checkDebounceTimer = null;
+
+// Check current item for changes (without switching away)
+export function checkCurrentItemForChanges() {
+  const addinInstance = createAddIn();
+  const Office = addinInstance.Office;
+  const state = addinInstance.state();
+  const currentItem = state.currentItem;
+
+  if (!currentItem) {
+    console.log('No current item to check');
+    return Promise.resolve(null);
+  }
+
+  const liveItem = Office.context.mailbox.item;
+  if (!liveItem || liveItem.itemId !== currentItem.itemId) {
+    console.log('Live item does not match current item');
+    return Promise.resolve(null);
+  }
+
+  console.log('Checking current item for changes:', currentItem.itemId);
+
+  // Increment changeChecks counter
+  addinInstance.changeState({
+    eventCounts: {
+      changeChecks: state.eventCounts.changeChecks + 1
+    }
+  });
+
+  // Capture fresh snapshot of currently selected item
+  return captureItemSnapshot(liveItem).then(newSnapshot => {
+    const changes = compareItemSnapshots(currentItem, newSnapshot);
+
+    if (changes) {
+      console.log('Changes detected in current item:', changes);
+
+      // Update currentItem with new snapshot
+      addinInstance.changeState({
+        currentItem: newSnapshot,
+        globalData: {
+          lastCurrentItemChanges: changes,
+          lastChangeCheckTime: new Date().toISOString()
+        }
+      });
+
+      displayItemChanges(changes);
+      updateEventCountsDisplay();
+
+      return changes;
+    } else {
+      console.log('No changes detected in current item');
+
+      // Update the timestamp even if no changes
+      addinInstance.changeState({
+        currentItem: newSnapshot,
+        globalData: {
+          lastChangeCheckTime: new Date().toISOString()
+        }
+      });
+
+      // Show "no changes" message
+      const changesElement = document.getElementById('itemChanges');
+      if (changesElement) {
+        changesElement.innerHTML = '<div class="info-message">No changes detected</div>';
+      }
+
+      updateEventCountsDisplay();
+
+      return null;
+    }
+  }).catch(error => {
+    console.error('Error checking current item for changes:', error);
+    return null;
+  });
+}
+
+// Debounced version to avoid excessive checks
+export function debouncedCheckCurrentItem() {
+  if (checkDebounceTimer) clearTimeout(checkDebounceTimer);
+  checkDebounceTimer = setTimeout(() => {
+    checkCurrentItemForChanges();
+  }, 1000);
+}
+
 // Update event counts display in UI
 export function updateEventCountsDisplay() {
   const addinInstance = createAddIn()
@@ -347,7 +798,8 @@ export function updateEventCountsDisplay() {
   if (countsElement) {
     countsElement.textContent = `Commands: ${state.eventCounts.commands}, ` +
       `Launch Events: ${state.eventCounts.launchEvents}, ` +
-      `Item Changes: ${state.eventCounts.itemChanges}`
+      `Item Changes: ${state.eventCounts.itemChanges}, ` +
+      `Change Checks: ${state.eventCounts.changeChecks}`
   }
 }
 
@@ -357,18 +809,88 @@ export function initializeTaskpaneUI() {
   if (statusElement) {
     const addinInstance = createAddIn()
     const hasItem = addinInstance.Office.context.mailbox && addinInstance.Office.context.mailbox.item
+    const platform = isDesktop() ? 'Desktop' : 'Web'
     if (hasItem) {
-      statusElement.textContent = 'Aladdin is ready! Item selected.'
+      statusElement.textContent = `Aladdin is ready on ${platform}! Item selected.`
     } else {
-      statusElement.textContent = 'Aladdin is ready! No item selected.'
+      statusElement.textContent = `Aladdin is ready on ${platform}! No item selected.`
     }
   }
   updateEventCountsDisplay()
+
+  // Setup refresh button
+  const refreshButton = document.getElementById('refreshButton')
+  if (refreshButton) {
+    refreshButton.addEventListener('click', () => {
+      console.log('Refresh button clicked');
+      checkCurrentItemForChanges();
+    });
+  }
+
+  // Register event listeners for multi-event strategy
+  registerMultiEventListeners();
+}
+
+// Store event listeners for cleanup
+let eventListeners = [];
+
+// Register multiple event listeners to trigger change checks
+function registerMultiEventListeners() {
+  console.log('Registering multi-event listeners');
+
+  // Window focus event
+  const focusHandler = () => {
+    console.log('Window gained focus, checking for changes');
+    debouncedCheckCurrentItem();
+  };
+  window.addEventListener('focus', focusHandler);
+  eventListeners.push({ target: window, event: 'focus', handler: focusHandler });
+
+  // Document visibility change
+  const visibilityHandler = () => {
+    if (!document.hidden) {
+      console.log('Document became visible, checking for changes');
+      debouncedCheckCurrentItem();
+    }
+  };
+  document.addEventListener('visibilitychange', visibilityHandler);
+  eventListeners.push({ target: document, event: 'visibilitychange', handler: visibilityHandler });
+
+  // User clicks in taskpane
+  const clickHandler = () => {
+    debouncedCheckCurrentItem();
+  };
+  document.addEventListener('click', clickHandler);
+  eventListeners.push({ target: document, event: 'click', handler: clickHandler });
+
+  // User presses key in taskpane
+  const keydownHandler = () => {
+    debouncedCheckCurrentItem();
+  };
+  document.addEventListener('keydown', keydownHandler);
+  eventListeners.push({ target: document, event: 'keydown', handler: keydownHandler });
+
+  console.log('Multi-event listeners registered');
+}
+
+// Cleanup event listeners
+function cleanupEventListeners() {
+  console.log('Cleaning up event listeners');
+  eventListeners.forEach(({ target, event, handler }) => {
+    target.removeEventListener(event, handler);
+  });
+  eventListeners = [];
 }
 
 // Show the taskpane programmatically
 export function showAsTaskpane() {
   const addinInstance = createAddIn()
+
+  // Check if we're on desktop - if so, don't try to show programmatically
+  if (isDesktop()) {
+    console.log('Desktop Outlook detected - taskpane must be opened manually via ribbon')
+    return Promise.resolve(false)
+  }
 
   if (!addinInstance.Office.addin) {
     console.error('Office.addin not available')
@@ -414,29 +936,146 @@ export function registerItemChangedHandler() {
   }
 }
 
-// ItemChanged event handler
+// ItemChanged event handler - CORRECTED LOGIC
 export function onItemChanged(eventArgs) {
-  console.log('ItemChanged event triggered', eventArgs)
-  const addinInstance = createAddIn()
-  const state = addinInstance.state()
+  console.log('ItemChanged event triggered', eventArgs);
+  const addinInstance = createAddIn();
+  const Office = addinInstance.Office;
+  const state = addinInstance.state();
+
   addinInstance.changeState({
     eventCounts: {
       itemChanges: state.eventCounts.itemChanges + 1
     }
-  })
+  });
 
-  const hasItem = addinInstance.Office.context.mailbox && addinInstance.Office.context.mailbox.item
-  // Update UI
-  const statusElement = document.getElementById('status')
-  if (statusElement) {
-    if (hasItem) {
-      const subject = addinInstance.Office.context.mailbox.item.subject || 'No subject'
-      statusElement.textContent = `Item: ${subject}`
+  // STEP 1: Check if we have a previous item to compare
+  const previousItem = state.currentItem;
+
+  if (previousItem) {
+    console.log('Previous item detected, re-reading to check for changes:', previousItem.itemId);
+
+    // STEP 2: Re-read the previous item to get its current state
+    rereadItemSnapshot(previousItem.itemId, Office)
+      .then(rereadSnapshot => {
+        console.log('Re-read snapshot obtained:', rereadSnapshot);
+
+        // STEP 3: Compare the original snapshot with the re-read one
+        const changes = compareItemSnapshots(previousItem, rereadSnapshot);
+
+        if (changes) {
+          console.log('Changes detected in previous item:', changes);
+
+          // Store detected changes
+          addinInstance.changeState({
+            globalData: {
+              lastItemChanges: changes
+            }
+          });
+
+          // Store the final state in history (with limit)
+          const updatedHistory = { ...state.itemHistory };
+          updatedHistory[previousItem.itemId] = rereadSnapshot;
+          const limitedHistory = limitItemHistory(updatedHistory);
+
+          addinInstance.changeState({
+            itemHistory: limitedHistory
+          });
+
+          // Display changes in UI
+          displayItemChanges(changes);
+        } else {
+          console.log('No changes detected in previous item');
+
+          // Store unchanged snapshot in history (with limit)
+          const updatedHistory = { ...state.itemHistory };
+          updatedHistory[previousItem.itemId] = rereadSnapshot;
+          const limitedHistory = limitItemHistory(updatedHistory);
+
+          addinInstance.changeState({
+            itemHistory: limitedHistory
+          });
+
+          // Clear changes display
+          const changesElement = document.getElementById('itemChanges');
+          if (changesElement) {
+            changesElement.innerHTML = '<div class="info-message">No changes detected in previous item</div>';
+          }
+        }
+      })
+      .catch(error => {
+        console.error('Error re-reading previous item:', error);
+
+        // Even if re-read fails, store the original snapshot (with limit)
+        const updatedHistory = { ...state.itemHistory };
+        updatedHistory[previousItem.itemId] = previousItem;
+        const limitedHistory = limitItemHistory(updatedHistory);
+
+        addinInstance.changeState({
+          itemHistory: limitedHistory
+        });
+      })
+      .finally(() => {
+        // STEP 4: Now capture the new current item
+        captureNewCurrentItem();
+      });
+  } else {
+    console.log('No previous item to check');
+    // No previous item, just capture the new one
+    captureNewCurrentItem();
+  }
+
+  // Helper function to capture the new current item
+  function captureNewCurrentItem() {
+    const newItem = Office.context.mailbox.item;
+
+    if (newItem) {
+      // Capture the new item's snapshot
+      captureItemSnapshot(newItem).then(newSnapshot => {
+        if (!newSnapshot) {
+          console.error('Failed to capture new item snapshot');
+          return;
+        }
+
+        console.log('New item snapshot captured:', newSnapshot);
+
+        // Store as current item
+        addinInstance.changeState({
+          currentItem: newSnapshot
+        });
+
+        // Update UI with current item
+        const subject = newItem.subject || 'No subject';
+        const statusElement = document.getElementById('status');
+        if (statusElement) {
+          statusElement.textContent = `Item: ${subject}`;
+        }
+      }).catch(error => {
+        console.error('Error capturing new item snapshot:', error);
+      });
     } else {
-      statusElement.textContent = 'Aladdin is ready! No item selected.'
+      console.log('No new item selected');
+
+      // Clear current item
+      addinInstance.changeState({
+        currentItem: null
+      });
+
+      const platform = isDesktop() ? 'Desktop' : 'Web';
+      const statusElement = document.getElementById('status');
+      if (statusElement) {
+        statusElement.textContent = `Aladdin is ready on ${platform}! No item selected.`;
+      }
+
+      // Clear changes display
+      const changesElement = document.getElementById('itemChanges');
+      if (changesElement) {
+        changesElement.innerHTML = '';
+      }
     }
   }
-  updateEventCountsDisplay()
+
+  updateEventCountsDisplay();
 }
 
 // Register VisibilityChanged event handler
@@ -502,6 +1141,13 @@ export function onVisibilityChanged(args) {
       : 'visible'
     statusElement.textContent = `Taskpane is now ${mode}`
   }
+
+  // Check for changes when taskpane becomes visible
+  if (args.visibilityMode !== addinInstance.Office.VisibilityMode.Hidden) {
+    console.log('Taskpane became visible, checking for changes');
+    debouncedCheckCurrentItem();
+  }
+
   updateEventCountsDisplay()
 }
 
@@ -524,6 +1170,7 @@ function onDocumentVisibilityChanged() {
     const mode = isHidden ? 'hidden' : 'visible'
     statusElement.textContent = `Taskpane is now ${mode}`
   }
+
   updateEventCountsDisplay()
 }
 
@@ -542,7 +1189,11 @@ export function action(event) {
   })
 
   updateEventCountsDisplay()
-  event.completed()
+
+  // Must call event.completed() for both desktop and web
+  if (event && event.completed) {
+    event.completed()
+  }
 }
 
 // Handler for OnNewMessageCompose event
@@ -559,17 +1210,22 @@ export function onNewMessageComposeHandler(event) {
     }
   })
 
-  // Show taskpane when new message is composed
-  showAsTaskpane()
-    .then(() => {
-      console.log('Taskpane opened from OnNewMessageCompose')
-    })
-    .catch(err => {
-      console.warn('Could not show taskpane:', err)
-    })
+  // Show taskpane when new message is composed (web only)
+  if (!isDesktop()) {
+    showAsTaskpane()
+      .then(() => {
+        console.log('Taskpane opened from OnNewMessageCompose')
+      })
+      .catch(err => {
+        console.warn('Could not show taskpane:', err)
+      })
+  }
 
   updateEventCountsDisplay()
-  event.completed()
+
+  if (event && event.completed) {
+    event.completed()
+  }
 }
 
 // Handler for OnMessageSend event
@@ -587,7 +1243,10 @@ export function onMessageSendHandler(event) {
   })
 
   updateEventCountsDisplay()
-  event.completed({ allowEvent: true })
+
+  if (event && event.completed) {
+    event.completed({ allowEvent: true })
+  }
 }
 
 // Handler for OnMessageRecipientsChanged event
@@ -604,8 +1263,14 @@ export function onRecipientsChangedHandler(event) {
     }
   })
 
+  // Check for changes since we're in compose mode and recipients changed
+  debouncedCheckCurrentItem()
+
   updateEventCountsDisplay()
-  event.completed()
+
+  if (event && event.completed) {
+    event.completed()
+  }
 }
 
 // Handler for OnMessageFromChanged event
@@ -622,8 +1287,14 @@ export function onFromChangedHandler(event) {
     }
   })
 
+  // Check for changes since we're in compose mode and from changed
+  debouncedCheckCurrentItem()
+
   updateEventCountsDisplay()
-  event.completed()
+
+  if (event && event.completed) {
+    event.completed()
+  }
 }
 
 // Initialize Office.actions associations
@@ -671,16 +1342,36 @@ export function initializeAddIn(Office) {
   registerItemChangedHandler()
   registerVisibilityChangedHandler()
 
-  // Show taskpane after a delay
-  setTimeout(() => {
-    showAsTaskpane()
-      .then(() => {
-        console.log('Taskpane auto-opened after initialization')
-      })
-      .catch(err => {
-        console.warn('Could not auto-open taskpane:', err)
-      })
-  }, 2000)
+  // Capture initial item if one is selected
+  const initialItem = Office.context.mailbox.item;
+  if (initialItem) {
+    console.log('Initial item detected, capturing snapshot');
+    captureItemSnapshot(initialItem).then(snapshot => {
+      if (snapshot) {
+        addinInstance.changeState({
+          currentItem: snapshot
+        });
+        console.log('Initial item snapshot captured:', snapshot);
+      }
+    }).catch(error => {
+      console.error('Error capturing initial item:', error);
+    });
+  }
+
+  // Only auto-show taskpane on web, not desktop
+  if (!isDesktop()) {
+    setTimeout(() => {
+      showAsTaskpane()
+        .then(() => {
+          console.log('Taskpane auto-opened after initialization')
+        })
+        .catch(err => {
+          console.warn('Could not auto-open taskpane:', err)
+        })
+    }, 2000)
+  } else {
+    console.log('Desktop Outlook detected - taskpane will not auto-open')
+  }
 
   return addinInstance
 }
