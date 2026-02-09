@@ -3,6 +3,7 @@
 const singleton = [false]
 const STATE_KEY = 'aladdin-addin-state'
 const MAX_ITEM_HISTORY = 10
+const AUTO_CHECK_INTERVAL = 3000 // 3 seconds
 
 export function createAddIn(Office) {
   if (typeof window !== 'undefined' && window.aladdinInstance) return window.aladdinInstance;
@@ -42,10 +43,12 @@ function aladdin(queue, Office) {
         changeChecks: 0
       },
       itemHistory: {}, // Store historical snapshots by itemId (limited to MAX_ITEM_HISTORY)
-      currentItem: null // Store the currently selected item's snapshot
+      currentItem: null, // Store the currently selected item's snapshot
+      lastCheckedSnapshot: null // Store the snapshot from last check
     },
     _storageWatcher: null,
     _pollInterval: null,
+    _autoCheckTimer: null,
     state() {
       return this._state
     },
@@ -74,6 +77,9 @@ function aladdin(queue, Office) {
             if (!loadedState.currentItem) {
               loadedState.currentItem = null
             }
+            if (!loadedState.lastCheckedSnapshot) {
+              loadedState.lastCheckedSnapshot = null
+            }
             if (!loadedState.eventCounts.changeChecks) {
               loadedState.eventCounts.changeChecks = 0
             }
@@ -91,6 +97,7 @@ function aladdin(queue, Office) {
       if (changes.globalData) Object.assign(this._state.globalData, changes.globalData);
       if (changes.itemHistory) Object.assign(this._state.itemHistory, changes.itemHistory);
       if (changes.hasOwnProperty('currentItem')) this._state.currentItem = changes.currentItem;
+      if (changes.hasOwnProperty('lastCheckedSnapshot')) this._state.lastCheckedSnapshot = changes.lastCheckedSnapshot;
       this.saveState()
     },
     watchStorage() {
@@ -146,8 +153,27 @@ function aladdin(queue, Office) {
       // Update UI when state changes
       updateEventCountsDisplay()
     },
+    startAutoCheck() {
+      if (this._autoCheckTimer) {
+        console.log('Auto-check timer already running')
+        return
+      }
+      console.log(`Starting auto-check timer (every ${AUTO_CHECK_INTERVAL}ms)`)
+      this._autoCheckTimer = setInterval(() => {
+        console.log('Auto-check timer fired')
+        checkCurrentItemForChanges()
+      }, AUTO_CHECK_INTERVAL)
+    },
+    stopAutoCheck() {
+      if (this._autoCheckTimer) {
+        console.log('Stopping auto-check timer')
+        clearInterval(this._autoCheckTimer)
+        this._autoCheckTimer = null
+      }
+    },
     cleanup() {
       this.unwatchStorage()
+      this.stopAutoCheck()
       this.queue().stop()
       cleanupEventListeners()
     }
@@ -546,109 +572,6 @@ export function captureItemSnapshot(item) {
   });
 }
 
-// Re-read an item using REST API to get current state
-export function rereadItemSnapshot(itemId, Office) {
-  return new Promise((resolve, reject) => {
-    // Check if this is the currently selected item - if so, use direct access
-    const currentItem = Office.context.mailbox.item;
-    if (currentItem && currentItem.itemId === itemId) {
-      console.log('Re-reading current item directly (no REST API needed)');
-      return captureItemSnapshot(currentItem).then(resolve).catch(reject);
-    }
-
-    // Try to use REST API for non-current items
-    Office.context.mailbox.getCallbackTokenAsync({ isRest: true }, (result) => {
-      if (result.status !== Office.AsyncResultStatus.Succeeded) {
-        console.warn('Failed to get REST access token:', result.error);
-        console.warn('Falling back to stored snapshot');
-        // Instead of rejecting, resolve with null to indicate we couldn't re-read
-        resolve(null);
-        return;
-      }
-
-      const accessToken = result.value;
-      const restUrl = Office.context.mailbox.restUrl;
-
-      // Convert itemId to REST format
-      let restId;
-      try {
-        restId = Office.context.mailbox.convertToRestId(
-          itemId,
-          Office.MailboxEnums.RestVersion.v2_0
-        );
-      } catch (error) {
-        console.error('Failed to convert itemId to REST format:', error);
-        resolve(null);
-        return;
-      }
-
-      // Construct the REST API URL
-      const getMessageUrl = `${restUrl}/v2.0/me/messages/${restId}?$select=subject,categories,from,toRecipients,ccRecipients,parentFolderId,itemClass`;
-
-      // Make REST API call
-      fetch(getMessageUrl, {
-        method: 'GET',
-        headers: {
-          'Authorization': 'Bearer ' + accessToken,
-          'Content-Type': 'application/json'
-        }
-      })
-        .then(response => {
-          if (!response.ok) {
-            throw new Error(`REST API returned ${response.status}: ${response.statusText}`);
-          }
-          return response.json();
-        })
-        .then(data => {
-          // Convert REST API response to our snapshot format
-          const snapshot = {
-            itemId: itemId,
-            conversationId: data.conversationId || '',
-            subject: data.subject || '',
-            categories: data.categories || [],
-            itemClass: data.itemClass || '',
-            folderId: data.parentFolderId || '',
-            timestamp: new Date().toISOString()
-          };
-
-          // Convert from address
-          if (data.from && data.from.emailAddress) {
-            snapshot.from = {
-              displayName: data.from.emailAddress.name || '',
-              emailAddress: data.from.emailAddress.address || ''
-            };
-          }
-
-          // Convert to recipients
-          if (data.toRecipients) {
-            snapshot.to = data.toRecipients.map(r => ({
-              displayName: r.emailAddress.name || '',
-              emailAddress: r.emailAddress.address || ''
-            }));
-          } else {
-            snapshot.to = [];
-          }
-
-          // Convert cc recipients
-          if (data.ccRecipients) {
-            snapshot.cc = data.ccRecipients.map(r => ({
-              displayName: r.emailAddress.name || '',
-              emailAddress: r.emailAddress.address || ''
-            }));
-          } else {
-            snapshot.cc = [];
-          }
-
-          resolve(snapshot);
-        })
-        .catch(error => {
-          console.error('Error fetching item via REST API:', error);
-          resolve(null); // Resolve with null instead of rejecting
-        });
-    });
-  });
-}
-
 // Compare two item snapshots and return detected changes
 export function compareItemSnapshots(oldSnapshot, newSnapshot) {
   if (!oldSnapshot || !newSnapshot) return null;
@@ -792,14 +715,18 @@ export function checkCurrentItemForChanges() {
 
   // Capture fresh snapshot of currently selected item
   return captureItemSnapshot(liveItem).then(newSnapshot => {
-    const changes = compareItemSnapshots(currentItem, newSnapshot);
+    // Use lastCheckedSnapshot if available, otherwise use currentItem
+    const baselineSnapshot = state.lastCheckedSnapshot || currentItem;
+
+    const changes = compareItemSnapshots(baselineSnapshot, newSnapshot);
 
     if (changes) {
       console.log('Changes detected in current item:', changes);
 
-      // Update currentItem with new snapshot
+      // Update both currentItem and lastCheckedSnapshot with new snapshot
       addinInstance.changeState({
         currentItem: newSnapshot,
+        lastCheckedSnapshot: newSnapshot,
         globalData: {
           lastCurrentItemChanges: changes,
           lastChangeCheckTime: new Date().toISOString()
@@ -813,9 +740,10 @@ export function checkCurrentItemForChanges() {
     } else {
       console.log('No changes detected in current item');
 
-      // Update the timestamp even if no changes
+      // Update both snapshots even if no changes
       addinInstance.changeState({
         currentItem: newSnapshot,
+        lastCheckedSnapshot: newSnapshot,
         globalData: {
           lastChangeCheckTime: new Date().toISOString()
         }
@@ -826,7 +754,6 @@ export function checkCurrentItemForChanges() {
       if (changesElement && (!changesElement.innerHTML || changesElement.innerHTML.includes('First time'))) {
         changesElement.innerHTML = '<div class="info-message">No changes detected (checked just now)</div>';
       }
-      // If there were changes shown before, leave them displayed
 
       updateEventCountsDisplay();
 
@@ -844,6 +771,59 @@ export function debouncedCheckCurrentItem() {
   checkDebounceTimer = setTimeout(() => {
     checkCurrentItemForChanges();
   }, 3000);
+}
+
+// Detect if we're in compose mode with a new item
+export function detectComposeMode(Office) {
+  const addinInstance = createAddIn();
+  const currentItem = Office.context.mailbox.item;
+  const state = addinInstance.state();
+
+  if (!currentItem) {
+    return;
+  }
+
+  // Check if this is a compose item
+  const isCompose = currentItem.itemType === Office.MailboxEnums.ItemType.Message &&
+    typeof currentItem.subject.getAsync === 'function';
+
+  if (isCompose) {
+    console.log('Compose mode detected');
+
+    // Check if this is a different item than what we have stored
+    const storedItem = state.currentItem;
+
+    if (!storedItem || storedItem.itemId !== currentItem.itemId) {
+      console.log('New compose item detected, capturing snapshot');
+
+      // Capture the compose item
+      captureItemSnapshot(currentItem).then(snapshot => {
+        if (snapshot) {
+          console.log('Compose item snapshot captured:', snapshot);
+
+          addinInstance.changeState({
+            currentItem: snapshot,
+            lastCheckedSnapshot: snapshot
+          });
+
+          // Update UI
+          const statusElement = document.getElementById('status');
+          if (statusElement) {
+            const subject = snapshot.subject || 'New Message';
+            statusElement.textContent = `Composing: ${subject}`;
+          }
+
+          // Clear any previous changes
+          const changesElement = document.getElementById('itemChanges');
+          if (changesElement) {
+            changesElement.innerHTML = '<div class="info-message">Compose mode - monitoring for changes (auto-check every 3s)</div>';
+          }
+        }
+      }).catch(error => {
+        console.error('Error capturing compose item:', error);
+      });
+    }
+  }
 }
 
 // Update event counts display in UI
@@ -891,6 +871,9 @@ export function initializeTaskpaneUI() {
   if (addinInstance.Office) {
     detectComposeMode(addinInstance.Office);
   }
+
+  // Start auto-check timer when taskpane initializes
+  addinInstance.startAutoCheck();
 }
 
 // Store event listeners for cleanup
@@ -902,29 +885,43 @@ function registerMultiEventListeners() {
 
   // Window focus event
   const focusHandler = () => {
-    console.log('Window gained focus, checking for changes');
+    console.log('Window gained focus');
 
     const addinInstance = createAddIn();
     if (addinInstance.Office) {
       detectComposeMode(addinInstance.Office);
     }
 
-    debouncedCheckCurrentItem();
+    // Start auto-check timer when focused
+    addinInstance.startAutoCheck();
   };
   window.addEventListener('focus', focusHandler);
   eventListeners.push({ target: window, event: 'focus', handler: focusHandler });
 
+  // Window blur event
+  const blurHandler = () => {
+    console.log('Window lost focus, stopping auto-check');
+    const addinInstance = createAddIn();
+    // Stop auto-check when not focused (optional - can remove if you want it to always run)
+    // addinInstance.stopAutoCheck();
+  };
+  window.addEventListener('blur', blurHandler);
+  eventListeners.push({ target: window, event: 'blur', handler: blurHandler });
+
   // Document visibility change
   const visibilityHandler = () => {
+    const addinInstance = createAddIn();
     if (!document.hidden) {
-      console.log('Document became visible, checking for changes');
+      console.log('Document became visible, starting auto-check');
 
-      const addinInstance = createAddIn();
       if (addinInstance.Office) {
         detectComposeMode(addinInstance.Office);
       }
 
-      debouncedCheckCurrentItem();
+      addinInstance.startAutoCheck();
+    } else {
+      console.log('Document hidden, stopping auto-check');
+      addinInstance.stopAutoCheck();
     }
   };
   document.addEventListener('visibilitychange', visibilityHandler);
@@ -996,7 +993,7 @@ export function registerItemChangedHandler() {
   }
 }
 
-// ItemChanged event handler - CORRECTED LOGIC
+// ItemChanged event handler - NO REST API APPROACH
 export function onItemChanged(eventArgs) {
   console.log('ItemChanged event triggered', eventArgs);
   const addinInstance = createAddIn();
@@ -1009,191 +1006,116 @@ export function onItemChanged(eventArgs) {
     }
   });
 
-  // STEP 1: Check if we have a previous item to compare
+  // STEP 1: Check if we have a previous item
   const previousItem = state.currentItem;
+  const lastChecked = state.lastCheckedSnapshot;
 
-  if (previousItem) {
-    console.log('Previous item detected, re-reading to check for changes:', previousItem.itemId);
+  if (previousItem && lastChecked) {
+    console.log('Previous item detected, comparing snapshots');
 
-    // STEP 2: Re-read the previous item to get its current state
-    rereadItemSnapshot(previousItem.itemId, Office)
-      .then(rereadSnapshot => {
-        // If re-read failed (null), use the original snapshot
-        if (!rereadSnapshot) {
-          console.log('Could not re-read item, using original snapshot');
-          rereadSnapshot = previousItem;
-        } else {
-          console.log('Re-read snapshot obtained:', rereadSnapshot);
-        }
+    // Compare the initial snapshot with the last checked snapshot
+    const changes = compareItemSnapshots(previousItem, lastChecked);
 
-        // STEP 3: Compare the original snapshot with the re-read one
-        const changes = compareItemSnapshots(previousItem, rereadSnapshot);
+    if (changes) {
+      console.log('Changes detected in previous item:', changes);
 
-        if (changes) {
-          console.log('Changes detected in previous item:', changes);
-
-          // Store detected changes
-          addinInstance.changeState({
-            globalData: {
-              lastItemChanges: changes
-            }
-          });
-
-          // Store the final state in history (with limit)
-          const updatedHistory = { ...state.itemHistory };
-          updatedHistory[previousItem.itemId] = rereadSnapshot;
-          const limitedHistory = limitItemHistory(updatedHistory);
-
-          addinInstance.changeState({
-            itemHistory: limitedHistory
-          });
-
-          // Display changes in UI
-          displayItemChanges(changes);
-        } else {
-          console.log('No changes detected in previous item');
-
-          // Store unchanged snapshot in history (with limit)
-          const updatedHistory = { ...state.itemHistory };
-          updatedHistory[previousItem.itemId] = rereadSnapshot;
-          const limitedHistory = limitItemHistory(updatedHistory);
-
-          addinInstance.changeState({
-            itemHistory: limitedHistory
-          });
-
-          // Clear changes display
-          const changesElement = document.getElementById('itemChanges');
-          if (changesElement) {
-            changesElement.innerHTML = '<div class="info-message">No changes detected in previous item</div>';
-          }
-        }
-      })
-      .catch(error => {
-        console.error('Error re-reading previous item:', error);
-
-        // Even if re-read fails, store the original snapshot (with limit)
-        const updatedHistory = { ...state.itemHistory };
-        updatedHistory[previousItem.itemId] = previousItem;
-        const limitedHistory = limitItemHistory(updatedHistory);
-
-        addinInstance.changeState({
-          itemHistory: limitedHistory
-        });
-      })
-      .finally(() => {
-        // STEP 4: Now capture the new current item
-        captureNewCurrentItem();
-      });
-  } else {
-    console.log('No previous item to check');
-    // No previous item, just capture the new one
-    captureNewCurrentItem();
-  }
-
-  // Helper function to capture the new current item
-  function captureNewCurrentItem() {
-    const newItem = Office.context.mailbox.item;
-
-    if (newItem) {
-      // Capture the new item's snapshot
-      captureItemSnapshot(newItem).then(newSnapshot => {
-        if (!newSnapshot) {
-          console.error('Failed to capture new item snapshot');
-          return;
-        }
-
-        console.log('New item snapshot captured:', newSnapshot);
-
-        // Store as current item
-        addinInstance.changeState({
-          currentItem: newSnapshot
-        });
-
-        // Update UI with current item
-        const subject = newItem.subject || 'No subject';
-        const statusElement = document.getElementById('status');
-        if (statusElement) {
-          statusElement.textContent = `Item: ${subject}`;
-        }
-      }).catch(error => {
-        console.error('Error capturing new item snapshot:', error);
-      });
-    } else {
-      console.log('No new item selected');
-
-      // Clear current item
+      // Store detected changes
       addinInstance.changeState({
-        currentItem: null
+        globalData: {
+          lastItemChanges: changes
+        }
       });
 
-      const platform = isDesktop() ? 'Desktop' : 'Web';
-      const statusElement = document.getElementById('status');
-      if (statusElement) {
-        statusElement.textContent = `Aladdin is ready on ${platform}! No item selected.`;
-      }
+      // Store the final state in history (with limit)
+      const updatedHistory = { ...state.itemHistory };
+      updatedHistory[previousItem.itemId] = lastChecked;
+      const limitedHistory = limitItemHistory(updatedHistory);
+
+      addinInstance.changeState({
+        itemHistory: limitedHistory
+      });
+
+      // Display changes in UI
+      displayItemChanges(changes);
+    } else {
+      console.log('No changes detected in previous item');
+
+      // Store snapshot in history (with limit)
+      const updatedHistory = { ...state.itemHistory };
+      updatedHistory[previousItem.itemId] = lastChecked;
+      const limitedHistory = limitItemHistory(updatedHistory);
+
+      addinInstance.changeState({
+        itemHistory: limitedHistory
+      });
 
       // Clear changes display
       const changesElement = document.getElementById('itemChanges');
       if (changesElement) {
-        changesElement.innerHTML = '';
+        changesElement.innerHTML = '<div class="info-message">No changes detected in previous item</div>';
       }
+    }
+  } else {
+    console.log('No previous item to check');
+  }
+
+  // STEP 2: Capture the new current item
+  const newItem = Office.context.mailbox.item;
+
+  if (newItem) {
+    // Capture the new item's snapshot
+    captureItemSnapshot(newItem).then(newSnapshot => {
+      if (!newSnapshot) {
+        console.error('Failed to capture new item snapshot');
+        return;
+      }
+
+      console.log('New item snapshot captured:', newSnapshot);
+
+      // Store as both current item and last checked (they start the same)
+      addinInstance.changeState({
+        currentItem: newSnapshot,
+        lastCheckedSnapshot: newSnapshot
+      });
+
+      // Update UI with current item
+      const subject = newItem.subject || 'No subject';
+      const statusElement = document.getElementById('status');
+      if (statusElement) {
+        statusElement.textContent = `Item: ${subject}`;
+      }
+
+      // Restart auto-check for new item
+      addinInstance.startAutoCheck();
+    }).catch(error => {
+      console.error('Error capturing new item snapshot:', error);
+    });
+  } else {
+    console.log('No new item selected');
+
+    // Clear current item
+    addinInstance.changeState({
+      currentItem: null,
+      lastCheckedSnapshot: null
+    });
+
+    // Stop auto-check when no item
+    addinInstance.stopAutoCheck();
+
+    const platform = isDesktop() ? 'Desktop' : 'Web';
+    const statusElement = document.getElementById('status');
+    if (statusElement) {
+      statusElement.textContent = `Aladdin is ready on ${platform}! No item selected.`;
+    }
+
+    // Clear changes display
+    const changesElement = document.getElementById('itemChanges');
+    if (changesElement) {
+      changesElement.innerHTML = '';
     }
   }
 
   updateEventCountsDisplay();
-}
-
-// Detect if we're in compose mode with a new item
-export function detectComposeMode(Office) {
-  const addinInstance = createAddIn();
-  const currentItem = Office.context.mailbox.item;
-  const state = addinInstance.state();
-
-  if (!currentItem) {
-    return;
-  }
-
-  // Check if this is a compose item
-  const isCompose = currentItem.itemType === Office.MailboxEnums.ItemType.Message &&
-    typeof currentItem.subject.getAsync === 'function';
-
-  if (isCompose) {
-    console.log('Compose mode detected');
-
-    // Check if this is a different item than what we have stored
-    const storedItem = state.currentItem;
-
-    if (!storedItem || storedItem.itemId !== currentItem.itemId) {
-      console.log('New compose item detected, capturing snapshot');
-
-      // Capture the compose item
-      captureItemSnapshot(currentItem).then(snapshot => {
-        if (snapshot) {
-          console.log('Compose item snapshot captured:', snapshot);
-
-          addinInstance.changeState({
-            currentItem: snapshot
-          });
-
-          // Update UI
-          const statusElement = document.getElementById('status');
-          if (statusElement) {
-            const subject = currentItem.subject || 'New Message';
-            statusElement.textContent = `Composing: ${subject}`;
-          }
-
-          // Clear any previous changes
-          const changesElement = document.getElementById('itemChanges');
-          if (changesElement) {
-            changesElement.innerHTML = '<div class="info-message">Compose mode - monitoring for changes</div>';
-          }
-        }
-      }).catch(error => {
-        console.error('Error capturing compose item:', error);
-      });
-    }
-  }
 }
 
 // Register VisibilityChanged event handler
@@ -1262,12 +1184,16 @@ export function onVisibilityChanged(args) {
 
   // Check for changes when taskpane becomes visible
   if (args.visibilityMode !== addinInstance.Office.VisibilityMode.Hidden) {
-    console.log('Taskpane became visible, checking for changes');
+    console.log('Taskpane became visible, starting auto-check');
 
     // Detect if we're in compose mode
     detectComposeMode(addinInstance.Office);
 
-    debouncedCheckCurrentItem();
+    // Start auto-check timer
+    addinInstance.startAutoCheck();
+  } else {
+    console.log('Taskpane hidden, stopping auto-check');
+    addinInstance.stopAutoCheck();
   }
 
   updateEventCountsDisplay()
@@ -1386,7 +1312,7 @@ export function onRecipientsChangedHandler(event) {
   })
 
   // Check for changes since we're in compose mode and recipients changed
-  debouncedCheckCurrentItem()
+  checkCurrentItemForChanges()
 
   updateEventCountsDisplay()
 
@@ -1410,7 +1336,7 @@ export function onFromChangedHandler(event) {
   })
 
   // Check for changes since we're in compose mode and from changed
-  debouncedCheckCurrentItem()
+  checkCurrentItemForChanges()
 
   updateEventCountsDisplay()
 
@@ -1471,9 +1397,13 @@ export function initializeAddIn(Office) {
     captureItemSnapshot(initialItem).then(snapshot => {
       if (snapshot) {
         addinInstance.changeState({
-          currentItem: snapshot
+          currentItem: snapshot,
+          lastCheckedSnapshot: snapshot
         });
         console.log('Initial item snapshot captured:', snapshot);
+
+        // Start auto-check for initial item
+        addinInstance.startAutoCheck();
       }
     }).catch(error => {
       console.error('Error capturing initial item:', error);
