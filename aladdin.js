@@ -626,8 +626,8 @@ export function compareItemSnapshots(oldSnapshot, newSnapshot) {
   if (oldCategories !== newCategories) {
     changes.detected.push({
       type: 'categories',
-      old: oldSnapshot.categories || [],
-      new: newSnapshot.categories || []
+      old: [...(oldSnapshot.categories || [])], // Create copy of array
+      new: [...(newSnapshot.categories || [])]  // Create copy of array
     });
   }
 
@@ -635,8 +635,8 @@ export function compareItemSnapshots(oldSnapshot, newSnapshot) {
   if (oldSnapshot.folderId !== newSnapshot.folderId && oldSnapshot.folderId && newSnapshot.folderId) {
     changes.detected.push({
       type: 'folder',
-      old: oldSnapshot.folderId,
-      new: newSnapshot.folderId
+      old: String(oldSnapshot.folderId),
+      new: String(newSnapshot.folderId)
     });
   }
 
@@ -644,8 +644,8 @@ export function compareItemSnapshots(oldSnapshot, newSnapshot) {
   if (oldSnapshot.itemClass !== newSnapshot.itemClass) {
     changes.detected.push({
       type: 'itemClass',
-      old: oldSnapshot.itemClass,
-      new: newSnapshot.itemClass
+      old: String(oldSnapshot.itemClass),
+      new: String(newSnapshot.itemClass)
     });
   }
 
@@ -655,30 +655,44 @@ export function compareItemSnapshots(oldSnapshot, newSnapshot) {
   if (oldFrom !== newFrom) {
     changes.detected.push({
       type: 'from',
-      old: oldSnapshot.from,
-      new: newSnapshot.from
+      oldEmail: oldFrom,
+      newEmail: newFrom,
+      oldDisplay: oldSnapshot.from ? oldSnapshot.from.displayName : '',
+      newDisplay: newSnapshot.from ? newSnapshot.from.displayName : ''
     });
   }
 
   // Check to recipients changes
-  const oldTo = (oldSnapshot.to || []).map(r => r.emailAddress).sort().join(',');
-  const newTo = (newSnapshot.to || []).map(r => r.emailAddress).sort().join(',');
-  if (oldTo !== newTo) {
+  const oldToEmails = (oldSnapshot.to || []).map(r => r.emailAddress).sort().join(',');
+  const newToEmails = (newSnapshot.to || []).map(r => r.emailAddress).sort().join(',');
+  if (oldToEmails !== newToEmails) {
     changes.detected.push({
       type: 'to',
-      old: oldSnapshot.to || [],
-      new: newSnapshot.to || []
+      oldList: (oldSnapshot.to || []).map(r => ({
+        email: r.emailAddress,
+        name: r.displayName
+      })),
+      newList: (newSnapshot.to || []).map(r => ({
+        email: r.emailAddress,
+        name: r.displayName
+      }))
     });
   }
 
   // Check cc recipients changes
-  const oldCc = (oldSnapshot.cc || []).map(r => r.emailAddress).sort().join(',');
-  const newCc = (newSnapshot.cc || []).map(r => r.emailAddress).sort().join(',');
-  if (oldCc !== newCc) {
+  const oldCcEmails = (oldSnapshot.cc || []).map(r => r.emailAddress).sort().join(',');
+  const newCcEmails = (newSnapshot.cc || []).map(r => r.emailAddress).sort().join(',');
+  if (oldCcEmails !== newCcEmails) {
     changes.detected.push({
       type: 'cc',
-      old: oldSnapshot.cc || [],
-      new: newSnapshot.cc || []
+      oldList: (oldSnapshot.cc || []).map(r => ({
+        email: r.emailAddress,
+        name: r.displayName
+      })),
+      newList: (newSnapshot.cc || []).map(r => ({
+        email: r.emailAddress,
+        name: r.displayName
+      }))
     });
   }
 
@@ -700,12 +714,10 @@ export function displayItemChanges(changes) {
   changes.detected.forEach(change => {
     switch(change.type) {
       case 'categories':
-        const oldCats = Array.isArray(change.old) ? change.old.join(', ') : JSON.stringify(change.old);
-        const newCats = Array.isArray(change.new) ? change.new.join(', ') : JSON.stringify(change.new);
         html += `<div class="change-item">
           <strong>Categories:</strong><br>
-          Old: ${oldCats || '(none)'}<br>
-          New: ${newCats || '(none)'}
+          Old: ${change.old.join(', ') || '(none)'}<br>
+          New: ${change.new.join(', ') || '(none)'}
         </div>`;
         break;
 
@@ -713,65 +725,61 @@ export function displayItemChanges(changes) {
         html += `<div class="change-item">
           <strong>Folder Changed</strong><br>
           Item was moved to a different folder<br>
-          Old: ${change.old || '(unknown)'}<br>
-          New: ${change.new || '(unknown)'}
+          Old: ${change.old}<br>
+          New: ${change.new}
         </div>`;
         break;
 
       case 'itemClass':
         html += `<div class="change-item">
           <strong>Item Class Changed</strong><br>
-          Old: ${change.old || '(unknown)'}<br>
-          New: ${change.new || '(unknown)'}
+          Old: ${change.old}<br>
+          New: ${change.new}
         </div>`;
         break;
 
       case 'from':
-        const oldFromEmail = change.old && typeof change.old === 'object'
-          ? change.old.emailAddress
-          : String(change.old || '(none)');
-        const newFromEmail = change.new && typeof change.new === 'object'
-          ? change.new.emailAddress
-          : String(change.new || '(none)');
+        const oldFromDisplay = change.oldDisplay || change.oldEmail || '(none)';
+        const newFromDisplay = change.newDisplay || change.newEmail || '(none)';
         html += `<div class="change-item">
           <strong>From:</strong><br>
-          Old: ${oldFromEmail}<br>
-          New: ${newFromEmail}
+          Old: ${oldFromDisplay} ${change.oldEmail ? `&lt;${change.oldEmail}&gt;` : ''}<br>
+          New: ${newFromDisplay} ${change.newEmail ? `&lt;${change.newEmail}&gt;` : ''}
         </div>`;
         break;
 
       case 'to':
-        const oldToList = Array.isArray(change.old)
-          ? change.old.map(r => r.emailAddress || String(r)).join(', ')
-          : String(change.old || '(none)');
-        const newToList = Array.isArray(change.new)
-          ? change.new.map(r => r.emailAddress || String(r)).join(', ')
-          : String(change.new || '(none)');
+        const oldToDisplay = change.oldList.length > 0
+          ? change.oldList.map(r => `${r.name || r.email} ${r.name ? `&lt;${r.email}&gt;` : ''}`).join(', ')
+          : '(none)';
+        const newToDisplay = change.newList.length > 0
+          ? change.newList.map(r => `${r.name || r.email} ${r.name ? `&lt;${r.email}&gt;` : ''}`).join(', ')
+          : '(none)';
         html += `<div class="change-item">
           <strong>To Recipients:</strong><br>
-          Old: ${oldToList || '(none)'}<br>
-          New: ${newToList || '(none)'}
+          Old: ${oldToDisplay}<br>
+          New: ${newToDisplay}
         </div>`;
         break;
 
       case 'cc':
-        const oldCcList = Array.isArray(change.old)
-          ? change.old.map(r => r.emailAddress || String(r)).join(', ')
-          : String(change.old || '(none)');
-        const newCcList = Array.isArray(change.new)
-          ? change.new.map(r => r.emailAddress || String(r)).join(', ')
-          : String(change.new || '(none)');
+        const oldCcDisplay = change.oldList.length > 0
+          ? change.oldList.map(r => `${r.name || r.email} ${r.name ? `&lt;${r.email}&gt;` : ''}`).join(', ')
+          : '(none)';
+        const newCcDisplay = change.newList.length > 0
+          ? change.newList.map(r => `${r.name || r.email} ${r.name ? `&lt;${r.email}&gt;` : ''}`).join(', ')
+          : '(none)';
         html += `<div class="change-item">
           <strong>CC Recipients:</strong><br>
-          Old: ${oldCcList || '(none)'}<br>
-          New: ${newCcList || '(none)'}
+          Old: ${oldCcDisplay}<br>
+          New: ${newCcDisplay}
         </div>`;
         break;
 
       default:
         html += `<div class="change-item">
           <strong>Unknown Change Type: ${change.type}</strong><br>
-          ${JSON.stringify(change, null, 2)}
+          <pre>${JSON.stringify(change, null, 2)}</pre>
         </div>`;
     }
   });
