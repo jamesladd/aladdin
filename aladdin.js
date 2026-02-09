@@ -400,137 +400,169 @@ export function captureItemSnapshot(item) {
   if (!item) return Promise.resolve(null);
 
   return new Promise((resolve) => {
+    // Determine if we're in compose or read mode
+    const isComposeMode = item.itemType === Office.MailboxEnums.ItemType.Message &&
+      typeof item.subject.getAsync === 'function';
+
     const snapshot = {
       itemId: item.itemId,
-      conversationId: item.conversationId,
-      subject: item.subject || '',
+      conversationId: item.conversationId || '',
+      subject: '', // Will be filled in below
       timestamp: new Date().toISOString()
     };
 
-    // Determine if we're in compose or read mode
-    const isComposeMode = item.itemType === Office.MailboxEnums.ItemType.Message &&
-      (item.to && typeof item.to.getAsync === 'function');
-
-    // Capture categories
-    item.categories.getAsync((result) => {
-      if (result.status === Office.AsyncResultStatus.Succeeded) {
-        snapshot.categories = result.value || [];
-      } else {
-        snapshot.categories = [];
-      }
-
-      // Capture item class (gives context about item type and location)
-      snapshot.itemClass = item.itemClass || '';
-
-      // Try to get folder information if available (limited API support)
-      if (item.getItemIdAsync) {
-        item.getItemIdAsync((folderResult) => {
-          if (folderResult.status === Office.AsyncResultStatus.Succeeded) {
-            snapshot.folderId = folderResult.value;
-          }
-          continueCapture();
-        });
-      } else {
-        continueCapture();
-      }
-
-      function continueCapture() {
-        // Capture from address
-        if (item.from) {
-          snapshot.from = {
-            displayName: item.from.displayName || '',
-            emailAddress: item.from.emailAddress || ''
-          };
-        }
-
-        // Handle TO and CC differently for read vs compose mode
-        if (isComposeMode) {
-          // COMPOSE MODE - use getAsync
-          captureComposeRecipients();
-        } else {
-          // READ MODE - direct property access
-          captureReadRecipients();
-        }
-      }
-
-      function captureComposeRecipients() {
-        // Capture to recipients (compose mode)
-        if (item.to && typeof item.to.getAsync === 'function') {
-          item.to.getAsync((toResult) => {
-            if (toResult.status === Office.AsyncResultStatus.Succeeded) {
-              snapshot.to = toResult.value.map(r => ({
-                displayName: r.displayName || '',
-                emailAddress: r.emailAddress || ''
-              }));
+    // Get subject (different for compose vs read)
+    const getSubject = () => {
+      return new Promise((resolveSubject) => {
+        if (isComposeMode && typeof item.subject.getAsync === 'function') {
+          item.subject.getAsync((result) => {
+            if (result.status === Office.AsyncResultStatus.Succeeded) {
+              snapshot.subject = result.value || 'New Message';
             } else {
-              snapshot.to = [];
+              snapshot.subject = 'New Message';
             }
-
-            // Capture cc recipients (compose mode)
-            if (item.cc && typeof item.cc.getAsync === 'function') {
-              item.cc.getAsync((ccResult) => {
-                if (ccResult.status === Office.AsyncResultStatus.Succeeded) {
-                  snapshot.cc = ccResult.value.map(r => ({
-                    displayName: r.displayName || '',
-                    emailAddress: r.emailAddress || ''
-                  }));
-                } else {
-                  snapshot.cc = [];
-                }
-                resolve(snapshot);
-              });
-            } else {
-              snapshot.cc = [];
-              resolve(snapshot);
-            }
+            resolveSubject();
           });
         } else {
-          snapshot.to = [];
-          snapshot.cc = [];
-          resolve(snapshot);
+          snapshot.subject = item.subject || '';
+          resolveSubject();
         }
+      });
+    };
+
+    // Start by getting subject, then continue with rest
+    getSubject().then(() => {
+      continueCapture();
+    });
+
+    function continueCapture() {
+      // Capture categories
+      item.categories.getAsync((result) => {
+        if (result.status === Office.AsyncResultStatus.Succeeded) {
+          snapshot.categories = result.value || [];
+        } else {
+          snapshot.categories = [];
+        }
+
+        // Capture item class (gives context about item type and location)
+        snapshot.itemClass = item.itemClass || '';
+
+        // Try to get folder information if available (limited API support)
+        if (item.getItemIdAsync) {
+          item.getItemIdAsync((folderResult) => {
+            if (folderResult.status === Office.AsyncResultStatus.Succeeded) {
+              snapshot.folderId = folderResult.value;
+            }
+            captureFromAndRecipients();
+          });
+        } else {
+          captureFromAndRecipients();
+        }
+      });
+    }
+
+    function captureFromAndRecipients() {
+      // Capture from address
+      if (item.from) {
+        snapshot.from = {
+          displayName: item.from.displayName || '',
+          emailAddress: item.from.emailAddress || ''
+        };
       }
 
-      function captureReadRecipients() {
-        // READ MODE - direct property access (no getAsync)
+      // Handle TO and CC differently for read vs compose mode
+      if (isComposeMode) {
+        // COMPOSE MODE - use getAsync
+        captureComposeRecipients();
+      } else {
+        // READ MODE - direct property access
+        captureReadRecipients();
+      }
+    }
 
-        // Capture to recipients
-        if (item.to && Array.isArray(item.to)) {
-          snapshot.to = item.to.map(r => ({
-            displayName: r.displayName || '',
-            emailAddress: r.emailAddress || ''
-          }));
-        } else {
-          snapshot.to = [];
-        }
+    function captureComposeRecipients() {
+      // Capture to recipients (compose mode)
+      if (item.to && typeof item.to.getAsync === 'function') {
+        item.to.getAsync((toResult) => {
+          if (toResult.status === Office.AsyncResultStatus.Succeeded) {
+            snapshot.to = toResult.value.map(r => ({
+              displayName: r.displayName || '',
+              emailAddress: r.emailAddress || ''
+            }));
+          } else {
+            snapshot.to = [];
+          }
 
-        // Capture cc recipients
-        if (item.cc && Array.isArray(item.cc)) {
-          snapshot.cc = item.cc.map(r => ({
-            displayName: r.displayName || '',
-            emailAddress: r.emailAddress || ''
-          }));
-        } else {
-          snapshot.cc = [];
-        }
-
+          // Capture cc recipients (compose mode)
+          if (item.cc && typeof item.cc.getAsync === 'function') {
+            item.cc.getAsync((ccResult) => {
+              if (ccResult.status === Office.AsyncResultStatus.Succeeded) {
+                snapshot.cc = ccResult.value.map(r => ({
+                  displayName: r.displayName || '',
+                  emailAddress: r.emailAddress || ''
+                }));
+              } else {
+                snapshot.cc = [];
+              }
+              resolve(snapshot);
+            });
+          } else {
+            snapshot.cc = [];
+            resolve(snapshot);
+          }
+        });
+      } else {
+        snapshot.to = [];
+        snapshot.cc = [];
         resolve(snapshot);
       }
-    });
+    }
+
+    function captureReadRecipients() {
+      // READ MODE - direct property access (no getAsync)
+
+      // Capture to recipients
+      if (item.to && Array.isArray(item.to)) {
+        snapshot.to = item.to.map(r => ({
+          displayName: r.displayName || '',
+          emailAddress: r.emailAddress || ''
+        }));
+      } else {
+        snapshot.to = [];
+      }
+
+      // Capture cc recipients
+      if (item.cc && Array.isArray(item.cc)) {
+        snapshot.cc = item.cc.map(r => ({
+          displayName: r.displayName || '',
+          emailAddress: r.emailAddress || ''
+        }));
+      } else {
+        snapshot.cc = [];
+      }
+
+      resolve(snapshot);
+    }
   });
 }
 
 // Re-read an item using REST API to get current state
 export function rereadItemSnapshot(itemId, Office) {
   return new Promise((resolve, reject) => {
-    // Office.js doesn't provide a direct way to read an item by ID when it's not selected
-    // We need to use REST API or EWS
+    // Check if this is the currently selected item - if so, use direct access
+    const currentItem = Office.context.mailbox.item;
+    if (currentItem && currentItem.itemId === itemId) {
+      console.log('Re-reading current item directly (no REST API needed)');
+      return captureItemSnapshot(currentItem).then(resolve).catch(reject);
+    }
 
-    // Get access token for REST API
+    // Try to use REST API for non-current items
     Office.context.mailbox.getCallbackTokenAsync({ isRest: true }, (result) => {
       if (result.status !== Office.AsyncResultStatus.Succeeded) {
-        console.error('Failed to get access token for REST API:', result.error);
-        reject(new Error('Failed to get access token'));
+        console.warn('Failed to get REST access token:', result.error);
+        console.warn('Falling back to stored snapshot');
+        // Instead of rejecting, resolve with null to indicate we couldn't re-read
+        resolve(null);
         return;
       }
 
@@ -538,10 +570,17 @@ export function rereadItemSnapshot(itemId, Office) {
       const restUrl = Office.context.mailbox.restUrl;
 
       // Convert itemId to REST format
-      const restId = Office.context.mailbox.convertToRestId(
-        itemId,
-        Office.MailboxEnums.RestVersion.v2_0
-      );
+      let restId;
+      try {
+        restId = Office.context.mailbox.convertToRestId(
+          itemId,
+          Office.MailboxEnums.RestVersion.v2_0
+        );
+      } catch (error) {
+        console.error('Failed to convert itemId to REST format:', error);
+        resolve(null);
+        return;
+      }
 
       // Construct the REST API URL
       const getMessageUrl = `${restUrl}/v2.0/me/messages/${restId}?$select=subject,categories,from,toRecipients,ccRecipients,parentFolderId,itemClass`;
@@ -604,7 +643,7 @@ export function rereadItemSnapshot(itemId, Office) {
         })
         .catch(error => {
           console.error('Error fetching item via REST API:', error);
-          reject(error);
+          resolve(null); // Resolve with null instead of rejecting
         });
     });
   });
@@ -846,6 +885,12 @@ export function initializeTaskpaneUI() {
 
   // Register event listeners for multi-event strategy
   registerMultiEventListeners();
+
+  // Detect compose mode on initialization
+  const addinInstance = createAddIn();
+  if (addinInstance.Office) {
+    detectComposeMode(addinInstance.Office);
+  }
 }
 
 // Store event listeners for cleanup
@@ -858,6 +903,12 @@ function registerMultiEventListeners() {
   // Window focus event
   const focusHandler = () => {
     console.log('Window gained focus, checking for changes');
+
+    const addinInstance = createAddIn();
+    if (addinInstance.Office) {
+      detectComposeMode(addinInstance.Office);
+    }
+
     debouncedCheckCurrentItem();
   };
   window.addEventListener('focus', focusHandler);
@@ -867,6 +918,12 @@ function registerMultiEventListeners() {
   const visibilityHandler = () => {
     if (!document.hidden) {
       console.log('Document became visible, checking for changes');
+
+      const addinInstance = createAddIn();
+      if (addinInstance.Office) {
+        detectComposeMode(addinInstance.Office);
+      }
+
       debouncedCheckCurrentItem();
     }
   };
@@ -961,7 +1018,13 @@ export function onItemChanged(eventArgs) {
     // STEP 2: Re-read the previous item to get its current state
     rereadItemSnapshot(previousItem.itemId, Office)
       .then(rereadSnapshot => {
-        console.log('Re-read snapshot obtained:', rereadSnapshot);
+        // If re-read failed (null), use the original snapshot
+        if (!rereadSnapshot) {
+          console.log('Could not re-read item, using original snapshot');
+          rereadSnapshot = previousItem;
+        } else {
+          console.log('Re-read snapshot obtained:', rereadSnapshot);
+        }
 
         // STEP 3: Compare the original snapshot with the re-read one
         const changes = compareItemSnapshots(previousItem, rereadSnapshot);
@@ -1081,6 +1144,58 @@ export function onItemChanged(eventArgs) {
   updateEventCountsDisplay();
 }
 
+// Detect if we're in compose mode with a new item
+export function detectComposeMode(Office) {
+  const addinInstance = createAddIn();
+  const currentItem = Office.context.mailbox.item;
+  const state = addinInstance.state();
+
+  if (!currentItem) {
+    return;
+  }
+
+  // Check if this is a compose item
+  const isCompose = currentItem.itemType === Office.MailboxEnums.ItemType.Message &&
+    typeof currentItem.subject.getAsync === 'function';
+
+  if (isCompose) {
+    console.log('Compose mode detected');
+
+    // Check if this is a different item than what we have stored
+    const storedItem = state.currentItem;
+
+    if (!storedItem || storedItem.itemId !== currentItem.itemId) {
+      console.log('New compose item detected, capturing snapshot');
+
+      // Capture the compose item
+      captureItemSnapshot(currentItem).then(snapshot => {
+        if (snapshot) {
+          console.log('Compose item snapshot captured:', snapshot);
+
+          addinInstance.changeState({
+            currentItem: snapshot
+          });
+
+          // Update UI
+          const statusElement = document.getElementById('status');
+          if (statusElement) {
+            const subject = currentItem.subject || 'New Message';
+            statusElement.textContent = `Composing: ${subject}`;
+          }
+
+          // Clear any previous changes
+          const changesElement = document.getElementById('itemChanges');
+          if (changesElement) {
+            changesElement.innerHTML = '<div class="info-message">Compose mode - monitoring for changes</div>';
+          }
+        }
+      }).catch(error => {
+        console.error('Error capturing compose item:', error);
+      });
+    }
+  }
+}
+
 // Register VisibilityChanged event handler
 export function registerVisibilityChangedHandler() {
   const addinInstance = createAddIn()
@@ -1148,6 +1263,10 @@ export function onVisibilityChanged(args) {
   // Check for changes when taskpane becomes visible
   if (args.visibilityMode !== addinInstance.Office.VisibilityMode.Hidden) {
     console.log('Taskpane became visible, checking for changes');
+
+    // Detect if we're in compose mode
+    detectComposeMode(addinInstance.Office);
+
     debouncedCheckCurrentItem();
   }
 
