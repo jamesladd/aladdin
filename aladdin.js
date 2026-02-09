@@ -407,6 +407,10 @@ export function captureItemSnapshot(item) {
       timestamp: new Date().toISOString()
     };
 
+    // Determine if we're in compose or read mode
+    const isComposeMode = item.itemType === Office.MailboxEnums.ItemType.Message &&
+      (item.to && typeof item.to.getAsync === 'function');
+
     // Capture categories
     item.categories.getAsync((result) => {
       if (result.status === Office.AsyncResultStatus.Succeeded) {
@@ -439,8 +443,19 @@ export function captureItemSnapshot(item) {
           };
         }
 
-        // Capture to recipients
-        if (item.to) {
+        // Handle TO and CC differently for read vs compose mode
+        if (isComposeMode) {
+          // COMPOSE MODE - use getAsync
+          captureComposeRecipients();
+        } else {
+          // READ MODE - direct property access
+          captureReadRecipients();
+        }
+      }
+
+      function captureComposeRecipients() {
+        // Capture to recipients (compose mode)
+        if (item.to && typeof item.to.getAsync === 'function') {
           item.to.getAsync((toResult) => {
             if (toResult.status === Office.AsyncResultStatus.Succeeded) {
               snapshot.to = toResult.value.map(r => ({
@@ -451,8 +466,8 @@ export function captureItemSnapshot(item) {
               snapshot.to = [];
             }
 
-            // Capture cc recipients
-            if (item.cc) {
+            // Capture cc recipients (compose mode)
+            if (item.cc && typeof item.cc.getAsync === 'function') {
               item.cc.getAsync((ccResult) => {
                 if (ccResult.status === Office.AsyncResultStatus.Succeeded) {
                   snapshot.cc = ccResult.value.map(r => ({
@@ -474,6 +489,32 @@ export function captureItemSnapshot(item) {
           snapshot.cc = [];
           resolve(snapshot);
         }
+      }
+
+      function captureReadRecipients() {
+        // READ MODE - direct property access (no getAsync)
+
+        // Capture to recipients
+        if (item.to && Array.isArray(item.to)) {
+          snapshot.to = item.to.map(r => ({
+            displayName: r.displayName || '',
+            emailAddress: r.emailAddress || ''
+          }));
+        } else {
+          snapshot.to = [];
+        }
+
+        // Capture cc recipients
+        if (item.cc && Array.isArray(item.cc)) {
+          snapshot.cc = item.cc.map(r => ({
+            displayName: r.displayName || '',
+            emailAddress: r.emailAddress || ''
+          }));
+        } else {
+          snapshot.cc = [];
+        }
+
+        resolve(snapshot);
       }
     });
   });
