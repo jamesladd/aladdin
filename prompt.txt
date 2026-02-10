@@ -238,7 +238,7 @@ Update the files to enable the addin to do the following:
 7. Get the name of the current user and show it as the first entry in the Taskpane.
 8. Get the Office context platform and show that after the name of the current user.
 9. Get the Office version and show that after the platform.
-10. Capture the selected email item headers categories and flags, and attachment information.
+10. Capture the selected email item headers - categories and flags, including the To, From, CC and attachment information.
 11. Capture the raw email headers with Office context mailbox item getAllInternetHeadersAsync, and convert the string into key/value pairs.
 12. Do not create a poll for changes for e.g. setInterval. Assume the regular raising of events keep things in sync.
 13. Check for getAsync before using async methods to get recipient properties like To, From and CC; and use async if available.
