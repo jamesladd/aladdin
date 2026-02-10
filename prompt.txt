@@ -1,7 +1,240 @@
-You are an expert at creating minimal Mail Add-ins for outlook web using the latest Version Overrides 1.1 and vanilla html, css and javascript.
+You are an expert at creating minimal Outlook Mail Add-ins using the latest Version Overrides 1.1 and vanilla html, css and javascript.
+Your goal is to create an add-in that knows when an email is selected and what the user did with the email.
+
 You MUST use https://jamesladd.github.io/aladdin as the Url for Add-in sources and assets.
 You MUST put CSS in its own file not inline.
 you MUST not add code that was not requested.
-You do not need to support the item type Appointment.
+You MUST make sure that the Add-in works in both Outlook Web and Desktop.
+You need to support Taskpane.
+You do not need to support Commands.
 
-Describe what you did in detail and why you did it.
+When responding to a request you MUST describe what you did in detail and why you did it, and include the full file
+sources for changed or new files.
+
+You MUST start with the following base aladdin.js file and modify it to achieve the requested outcomes:
+
+// aladdin.js
+
+const singleton = [false]
+
+export function createAladdin(Office) {
+  if (typeof window !== 'undefined' && window.aladdinInstance) return window.aladdinInstance;
+  if (singleton[0]) return singleton[0];
+  const instance = aladdin(Office)
+  if (typeof window !== 'undefined') window.aladdinInstance = instance;
+  if (typeof window === 'undefined') singleton[0] = instance;
+  instance.loadState()
+  instance.watchState()
+  return instance
+}
+
+function aladdin(Office) {
+  return {
+    Office,
+    _state: {
+      events: [],
+    },
+    state() {
+      // return the current state
+      return this._state
+    },
+    saveState() {
+      // save the current state to local storage
+    },
+    loadState() {
+      // load the current state from local storage
+    },
+    watchState() {
+      // listen to local storage to know when it changed
+    },
+    event(name, details) {
+      // record event named 'name' in state and store
+    },
+    initialize() {
+    }
+  }
+}
+
+You MUST start with the following runtime.js and modify it to achieve the requested outcomes:
+
+// runtime.js - Runtime initialization
+
+import { createAladdin } from './aladdin.js'
+
+// Wait for Office to be available
+function initializeRuntime() {
+  if (typeof Office === 'undefined') {
+    console.error('Office is not defined - Office.js may not be loaded')
+    return
+  }
+  // Office.onReady initialization
+  Office.onReady((info) => {
+    console.log('Office.onReady called', info)
+    if (info.host === Office.HostType.Outlook) {
+      const addin = createAladdin(Office)
+      addin.initialize()
+    }
+  })
+}
+
+// Call initialization
+initializeRuntime()
+
+You MUST start with the following tasskpane.html and modify it to achieve the requested outcomes:
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Aladdin Taskpane</title>
+
+    <!-- Load Office.js first -->
+    <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+
+    <link rel="stylesheet" href="taskpane.css">
+</head>
+<body>
+<div class="container">
+    <div id="status">Loading...</div>
+    <div id="events" class="events"></div>
+</div>
+
+<!-- Load runtime.js as a module AFTER Office.js -->
+<script type="module" src="runtime.js"></script>
+</body>
+</html>
+
+You MUST start with the following taskpane.css file and modify it to achieve the reuqested outcomes:
+
+/* taskpane.css */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f5f5f5;
+    color: #333;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.container {
+    padding: 20px;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.user-info {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.user-name {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.platform {
+    font-size: 14px;
+    opacity: 0.9;
+    font-weight: 400;
+}
+
+.section-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 15px;
+    color: #555;
+}
+
+.events {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.event-item {
+    background: white;
+    padding: 15px;
+    border-radius: 6px;
+    border-left: 4px solid #667eea;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.event-item:hover {
+    transform: translateX(2px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.event-name {
+    font-weight: 600;
+    color: #667eea;
+    margin-bottom: 5px;
+    font-size: 14px;
+}
+
+.event-timestamp {
+    font-size: 11px;
+    color: #999;
+    margin-bottom: 8px;
+}
+
+.event-details {
+    font-size: 13px;
+    color: #666;
+    background: #f9f9f9;
+    padding: 8px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.no-events {
+    text-align: center;
+    color: #999;
+    padding: 40px 20px;
+    font-style: italic;
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+    .container {
+        padding: 15px;
+    }
+
+    .user-info {
+        padding: 15px;
+    }
+
+    .user-name {
+        font-size: 16px;
+    }
+}
+
+
+Update the files to enable the addin to do the following:
+
+1. Listen to all events that can be listened to by a Web and Desktop enabled add-in, and call event() passing the name and details of the event.
+2. Keep the last 10 events passed to event() in order of most recent to least recent.
+3. Show the list set of events received in the Taskpane.
+4. Record received events in the addin state
+5. Save the addin state after it has changed
+6. Watch for changes in the stored addin state and load them when they have changed.
+7. Get the name of the current user and show it as the first entry in the Taskpane.
+8. Get the Office context platform and show that after the name of the current user.
+9. Get the Office version and show that after the platform.
+10. Capture the selected email item headers, categories and flags, including the To, From, CC and attachment information.
+

@@ -1,9 +1,6 @@
 // runtime.js - Runtime initialization
 
-import {
-  initializeAddIn,
-  initializeAssociations
-} from './aladdin.js'
+import { createAladdin } from './aladdin.js'
 
 // Wait for Office to be available
 function initializeRuntime() {
@@ -15,8 +12,8 @@ function initializeRuntime() {
   Office.onReady((info) => {
     console.log('Office.onReady called', info)
     if (info.host === Office.HostType.Outlook) {
-      initializeAssociations(Office)
-      initializeAddIn(Office)
+      const addin = createAladdin(Office)
+      addin.initialize()
     }
   })
 }
