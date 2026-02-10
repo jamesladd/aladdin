@@ -52,9 +52,6 @@ function aladdin(Office) {
     event(name, details) {
       // record event named 'name' in state and store
     },
-    checkChanges(itemDetails) {
-      if (!itemDetails) return;
-    },
     initialize() {
     },
   }
@@ -249,6 +246,4 @@ Update the files to enable the addin to do the following:
 14. You MUST register event handlers at the correct API level: use Office.context.mailbox.addHandlerAsync() for mailbox-level events (ItemChanged, OfficeThemeChanged) and use Office.context.mailbox.item.addHandlerAsync() for item-level events (RecipientsChanged, AttachmentsChanged, RecurrenceChanged, AppointmentTimeChanged, EnhancedLocationsChanged), and you MUST check that Office.context.mailbox.item exists before attempting to register item-level event handlers.
 15. Your MUST only register events that are actually supported by the Outlook Javascript API.
 16. When email item is selected its item id should be kept it as the _currentItemId in the instance not the state.
-17. When the _currentItemId is changed you must then call checkChanges.
-18. When checking item changes the item in the state with the corresponding itemId is used for comparison.
-19. Checking for item changes should include all the fields captured for an Item.
+17. You MUST track when an email items is selected and when it is deselected.
