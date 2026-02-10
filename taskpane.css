@@ -20,20 +20,6 @@ body {
     margin: 0 auto;
 }
 
-.status-section {
-    margin-bottom: 15px;
-}
-
-.status {
-    font-size: 14px;
-    font-weight: 600;
-    padding: 10px;
-    background: #fff;
-    border-radius: 6px;
-    text-align: center;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
 .user-info {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
@@ -53,17 +39,7 @@ body {
     font-size: 14px;
     opacity: 0.9;
     font-weight: 400;
-    margin-bottom: 4px;
-}
-
-.version {
-    font-size: 13px;
-    opacity: 0.85;
-    font-weight: 300;
-}
-
-.events-section {
-    margin-top: 20px;
+    margin-top: 4px;
 }
 
 .section-title {
@@ -107,7 +83,7 @@ body {
 }
 
 .event-details {
-    font-size: 13px;
+    font-size: 12px;
     color: #666;
     background: #f9f9f9;
     padding: 8px;
@@ -126,6 +102,25 @@ body {
     font-style: italic;
 }
 
+/* Scrollbar styling for event details */
+.event-details::-webkit-scrollbar {
+    width: 6px;
+}
+
+.event-details::-webkit-scrollbar-track {
+    background: #f0f0f0;
+    border-radius: 3px;
+}
+
+.event-details::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 3px;
+}
+
+.event-details::-webkit-scrollbar-thumb:hover {
+    background: #999;
+}
+
 /* Responsive adjustments */
 @media (max-width: 480px) {
     .container {
@@ -141,7 +136,7 @@ body {
     }
 
     .event-details {
-        font-size: 12px;
+        font-size: 11px;
         max-height: 200px;
     }
 }

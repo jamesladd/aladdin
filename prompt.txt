@@ -68,6 +68,7 @@ function initializeRuntime() {
     console.error('Office is not defined - Office.js may not be loaded')
     return
   }
+
   // Office.onReady initialization
   Office.onReady((info) => {
     console.log('Office.onReady called', info)
@@ -238,4 +239,6 @@ Update the files to enable the addin to do the following:
 8. Get the Office context platform and show that after the name of the current user.
 9. Get the Office version and show that after the platform.
 10. Capture the selected email item headers, categories and flags, including the To, From, CC and attachment information.
-11. Do not create a poll for changes for e.g. setInterval. Assume the regular raising of events keep things in sync.
+11. Capture the raw email headers with Office context mailbox item getAllInternetHeadersAsync.
+12. Do not create a poll for changes for e.g. setInterval. Assume the regular raising of events keep things in sync.
+13. Do not use async methods to get recipient properties like to, cc, and from, they are already resolved objects.
