@@ -242,4 +242,5 @@ Update the files to enable the addin to do the following:
 11. Capture the raw email headers with Office context mailbox item getAllInternetHeadersAsync, and convert the string into key/value pairs.
 12. Do not create a poll for changes for e.g. setInterval. Assume the regular raising of events keep things in sync.
 13. Check for getAsync before using async methods to get recipient properties like To, From and CC; and use async if available.
+14. You MUST register event handlers at the correct API level: use Office.context.mailbox.addHandlerAsync() for mailbox-level events (ItemChanged, OfficeThemeChanged) and use Office.context.mailbox.item.addHandlerAsync() for item-level events (RecipientsChanged, AttachmentsChanged, RecurrenceChanged, AppointmentTimeChanged, EnhancedLocationsChanged), and you MUST check that Office.context.mailbox.item exists before attempting to register item-level event handlers.
 
