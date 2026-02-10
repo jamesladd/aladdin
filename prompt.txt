@@ -253,3 +253,4 @@ Update the files to enable the addin to do the following:
 16. When email item is selected it should be kept it as the _currentItem in the instance not the state.
 17. You MUST set _previousItem to _currentItem before changing the _currentItem.
 18. When the _currentItem is changed you must then call checkChanges.
+19. Checking for item changes should include all the fields captured for an Item.
