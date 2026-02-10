@@ -6,23 +6,22 @@
         xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0"
         xsi:type="MailApp">
 
-    <!-- Basic Add-in Information -->
-    <Id>f364dbc5-58e7-46f5-806f-248d0eb98fcb</Id>
-    <Version>1.42.0.0</Version>
-    <ProviderName>Aladdin</ProviderName>
+    <!-- Basic Settings -->
+    <Id>8a8e3d85-8f9d-4b1e-9c3d-7a6b5c4d3e2f</Id>
+    <Version>1.44.0.0</Version>
+    <ProviderName>Aladdin A</ProviderName>
     <DefaultLocale>en-US</DefaultLocale>
-    <DisplayName DefaultValue="Aladdin E"/>
-    <Description DefaultValue="Minimal Outlook add-in with queue management - supports web and desktop"/>
-    <IconUrl DefaultValue="https://jamesladd.github.io/aladdin/assets/icon-32.png"/>
-    <HighResolutionIconUrl DefaultValue="https://jamesladd.github.io/aladdin/assets/icon-64.png"/>
-    <SupportUrl DefaultValue="https://jamesladd.github.io/aladdin"/>
+    <DisplayName DefaultValue="Aladdin Mail Tracker"/>
+    <Description DefaultValue="Tracks email events and displays user activity"/>
+    <IconUrl DefaultValue="https://jamesladd.github.io/aladdin/assets/icon-64.png"/>
+    <HighResolutionIconUrl DefaultValue="https://jamesladd.github.io/aladdin/assets/icon-128.png"/>
+    <SupportUrl DefaultValue="https://jamesladd.github.io/aladdin/support"/>
 
     <!-- Hosts -->
     <Hosts>
         <Host Name="Mailbox"/>
     </Hosts>
 
-    <!-- Requirements -->
     <Requirements>
         <Sets>
             <Set Name="Mailbox" MinVersion="1.1"/>
@@ -34,47 +33,42 @@
         <Form xsi:type="ItemRead">
             <DesktopSettings>
                 <SourceLocation DefaultValue="https://jamesladd.github.io/aladdin/taskpane.html"/>
-                <RequestedHeight>250</RequestedHeight>
+                <RequestedHeight>450</RequestedHeight>
             </DesktopSettings>
         </Form>
     </FormSettings>
 
     <!-- Permissions -->
-    <Permissions>ReadWriteItem</Permissions>
+    <Permissions>ReadWriteMailbox</Permissions>
 
-    <!-- All Form Factors -->
+    <!-- Activation Rule: Always show in taskpane for mail items -->
     <Rule xsi:type="RuleCollection" Mode="Or">
         <Rule xsi:type="ItemIs" ItemType="Message" FormType="Read"/>
         <Rule xsi:type="ItemIs" ItemType="Message" FormType="Edit"/>
+        <Rule xsi:type="ItemIs" ItemType="Appointment" FormType="Read"/>
+        <Rule xsi:type="ItemIs" ItemType="Appointment" FormType="Edit"/>
     </Rule>
 
-    <!-- Version Overrides 1.0 for broader desktop support -->
+    <DisableEntityHighlighting>false</DisableEntityHighlighting>
+
+    <!-- Version Overrides -->
     <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides" xsi:type="VersionOverridesV1_0">
 
-        <!-- Requirements -->
         <Requirements>
             <bt:Sets DefaultMinVersion="1.5">
                 <bt:Set Name="Mailbox"/>
             </bt:Sets>
         </Requirements>
 
-        <!-- Hosts -->
         <Hosts>
             <Host xsi:type="MailHost">
 
-                <!-- Desktop Form Factor -->
+                <!-- Taskpane Extension Point -->
                 <DesktopFormFactor>
-
-                    <!-- Function File for ExecuteFunction actions -->
-                    <FunctionFile resid="Commands.Url"/>
-
-                    <!-- Extension Point: Message Read Command Surface -->
                     <ExtensionPoint xsi:type="MessageReadCommandSurface">
                         <OfficeTab id="TabDefault">
                             <Group id="msgReadGroup">
                                 <Label resid="GroupLabel"/>
-
-                                <!-- Taskpane Button -->
                                 <Control xsi:type="Button" id="msgReadOpenPaneButton">
                                     <Label resid="TaskpaneButton.Label"/>
                                     <Supertip>
@@ -90,35 +84,14 @@
                                         <SourceLocation resid="Taskpane.Url"/>
                                     </Action>
                                 </Control>
-
-                                <!-- Action Button -->
-                                <Control xsi:type="Button" id="ActionButton">
-                                    <Label resid="ActionButton.Label"/>
-                                    <Supertip>
-                                        <Title resid="ActionButton.Label"/>
-                                        <Description resid="ActionButton.Tooltip"/>
-                                    </Supertip>
-                                    <Icon>
-                                        <bt:Image size="16" resid="Icon.16x16"/>
-                                        <bt:Image size="32" resid="Icon.32x32"/>
-                                        <bt:Image size="80" resid="Icon.80x80"/>
-                                    </Icon>
-                                    <Action xsi:type="ExecuteFunction">
-                                        <FunctionName>action</FunctionName>
-                                    </Action>
-                                </Control>
-
                             </Group>
                         </OfficeTab>
                     </ExtensionPoint>
 
-                    <!-- Extension Point: Message Compose Command Surface -->
                     <ExtensionPoint xsi:type="MessageComposeCommandSurface">
                         <OfficeTab id="TabDefault">
                             <Group id="msgComposeGroup">
                                 <Label resid="GroupLabel"/>
-
-                                <!-- Taskpane Button -->
                                 <Control xsi:type="Button" id="msgComposeOpenPaneButton">
                                     <Label resid="TaskpaneButton.Label"/>
                                     <Supertip>
@@ -134,33 +107,60 @@
                                         <SourceLocation resid="Taskpane.Url"/>
                                     </Action>
                                 </Control>
+                            </Group>
+                        </OfficeTab>
+                    </ExtensionPoint>
 
-                                <!-- Action Button for Compose Mode -->
-                                <Control xsi:type="Button" id="ComposeActionButton">
-                                    <Label resid="ActionButton.Label"/>
+                    <ExtensionPoint xsi:type="AppointmentOrganizerCommandSurface">
+                        <OfficeTab id="TabDefault">
+                            <Group id="apptOrganizerGroup">
+                                <Label resid="GroupLabel"/>
+                                <Control xsi:type="Button" id="apptOrganizerOpenPaneButton">
+                                    <Label resid="TaskpaneButton.Label"/>
                                     <Supertip>
-                                        <Title resid="ActionButton.Label"/>
-                                        <Description resid="ActionButton.Tooltip"/>
+                                        <Title resid="TaskpaneButton.Label"/>
+                                        <Description resid="TaskpaneButton.Tooltip"/>
                                     </Supertip>
                                     <Icon>
                                         <bt:Image size="16" resid="Icon.16x16"/>
                                         <bt:Image size="32" resid="Icon.32x32"/>
                                         <bt:Image size="80" resid="Icon.80x80"/>
                                     </Icon>
-                                    <Action xsi:type="ExecuteFunction">
-                                        <FunctionName>action</FunctionName>
+                                    <Action xsi:type="ShowTaskpane">
+                                        <SourceLocation resid="Taskpane.Url"/>
                                     </Action>
                                 </Control>
-
                             </Group>
                         </OfficeTab>
                     </ExtensionPoint>
 
+                    <ExtensionPoint xsi:type="AppointmentAttendeeCommandSurface">
+                        <OfficeTab id="TabDefault">
+                            <Group id="apptAttendeeGroup">
+                                <Label resid="GroupLabel"/>
+                                <Control xsi:type="Button" id="apptAttendeeOpenPaneButton">
+                                    <Label resid="TaskpaneButton.Label"/>
+                                    <Supertip>
+                                        <Title resid="TaskpaneButton.Label"/>
+                                        <Description resid="TaskpaneButton.Tooltip"/>
+                                    </Supertip>
+                                    <Icon>
+                                        <bt:Image size="16" resid="Icon.16x16"/>
+                                        <bt:Image size="32" resid="Icon.32x32"/>
+                                        <bt:Image size="80" resid="Icon.80x80"/>
+                                    </Icon>
+                                    <Action xsi:type="ShowTaskpane">
+                                        <SourceLocation resid="Taskpane.Url"/>
+                                    </Action>
+                                </Control>
+                            </Group>
+                        </OfficeTab>
+                    </ExtensionPoint>
                 </DesktopFormFactor>
+
             </Host>
         </Hosts>
 
-        <!-- Resources -->
         <Resources>
             <bt:Images>
                 <bt:Image id="Icon.16x16" DefaultValue="https://jamesladd.github.io/aladdin/assets/icon-16.png"/>
@@ -168,177 +168,17 @@
                 <bt:Image id="Icon.80x80" DefaultValue="https://jamesladd.github.io/aladdin/assets/icon-80.png"/>
             </bt:Images>
             <bt:Urls>
-                <bt:Url id="Commands.Url" DefaultValue="https://jamesladd.github.io/aladdin/commands.html"/>
                 <bt:Url id="Taskpane.Url" DefaultValue="https://jamesladd.github.io/aladdin/taskpane.html"/>
             </bt:Urls>
             <bt:ShortStrings>
                 <bt:String id="GroupLabel" DefaultValue="Aladdin"/>
-                <bt:String id="TaskpaneButton.Label" DefaultValue="Show Taskpane"/>
-                <bt:String id="ActionButton.Label" DefaultValue="Perform Action"/>
+                <bt:String id="TaskpaneButton.Label" DefaultValue="Show Aladdin"/>
             </bt:ShortStrings>
             <bt:LongStrings>
-                <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Opens the Aladdin taskpane"/>
-                <bt:String id="ActionButton.Tooltip" DefaultValue="Executes an action command"/>
+                <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Open the Aladdin taskpane to view email events"/>
             </bt:LongStrings>
         </Resources>
 
-        <!-- Version Overrides 1.1 for advanced web features -->
-        <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides/1.1" xsi:type="VersionOverridesV1_1">
-
-            <!-- Requirements for VersionOverrides 1.1 -->
-            <Requirements>
-                <bt:Sets DefaultMinVersion="1.10">
-                    <bt:Set Name="Mailbox"/>
-                </bt:Sets>
-            </Requirements>
-
-            <!-- Hosts -->
-            <Hosts>
-                <Host xsi:type="MailHost">
-
-                    <!-- Shared Runtime Configuration -->
-                    <Runtimes>
-                        <Runtime resid="Taskpane.Url">
-                            <Override type="javascript" resid="Runtime.Url"/>
-                        </Runtime>
-                    </Runtimes>
-
-                    <!-- Desktop Form Factor -->
-                    <DesktopFormFactor>
-
-                        <!-- Function File references the shared runtime -->
-                        <FunctionFile resid="Taskpane.Url"/>
-
-                        <!-- Extension Point: Message Read Command Surface -->
-                        <ExtensionPoint xsi:type="MessageReadCommandSurface">
-                            <OfficeTab id="TabDefault">
-                                <Group id="msgReadGroup">
-                                    <Label resid="GroupLabel"/>
-
-                                    <!-- Taskpane Button -->
-                                    <Control xsi:type="Button" id="msgReadOpenPaneButton">
-                                        <Label resid="TaskpaneButton.Label"/>
-                                        <Supertip>
-                                            <Title resid="TaskpaneButton.Label"/>
-                                            <Description resid="TaskpaneButton.Tooltip"/>
-                                        </Supertip>
-                                        <Icon>
-                                            <bt:Image size="16" resid="Icon.16x16"/>
-                                            <bt:Image size="32" resid="Icon.32x32"/>
-                                            <bt:Image size="80" resid="Icon.80x80"/>
-                                        </Icon>
-                                        <Action xsi:type="ShowTaskpane">
-                                            <SourceLocation resid="Taskpane.Url"/>
-                                            <SupportsPinning>true</SupportsPinning>
-                                        </Action>
-                                    </Control>
-
-                                    <!-- Action Button -->
-                                    <Control xsi:type="Button" id="ActionButton">
-                                        <Label resid="ActionButton.Label"/>
-                                        <Supertip>
-                                            <Title resid="ActionButton.Label"/>
-                                            <Description resid="ActionButton.Tooltip"/>
-                                        </Supertip>
-                                        <Icon>
-                                            <bt:Image size="16" resid="Icon.16x16"/>
-                                            <bt:Image size="32" resid="Icon.32x32"/>
-                                            <bt:Image size="80" resid="Icon.80x80"/>
-                                        </Icon>
-                                        <Action xsi:type="ExecuteFunction">
-                                            <FunctionName>action</FunctionName>
-                                        </Action>
-                                    </Control>
-
-                                </Group>
-                            </OfficeTab>
-                        </ExtensionPoint>
-
-                        <!-- Extension Point: Message Compose Command Surface -->
-                        <ExtensionPoint xsi:type="MessageComposeCommandSurface">
-                            <OfficeTab id="TabDefault">
-                                <Group id="msgComposeGroup">
-                                    <Label resid="GroupLabel"/>
-
-                                    <!-- Taskpane Button -->
-                                    <Control xsi:type="Button" id="msgComposeOpenPaneButton">
-                                        <Label resid="TaskpaneButton.Label"/>
-                                        <Supertip>
-                                            <Title resid="TaskpaneButton.Label"/>
-                                            <Description resid="TaskpaneButton.Tooltip"/>
-                                        </Supertip>
-                                        <Icon>
-                                            <bt:Image size="16" resid="Icon.16x16"/>
-                                            <bt:Image size="32" resid="Icon.32x32"/>
-                                            <bt:Image size="80" resid="Icon.80x80"/>
-                                        </Icon>
-                                        <Action xsi:type="ShowTaskpane">
-                                            <SourceLocation resid="Taskpane.Url"/>
-                                            <SupportsPinning>true</SupportsPinning>
-                                        </Action>
-                                    </Control>
-
-                                    <!-- Action Button for Compose Mode -->
-                                    <Control xsi:type="Button" id="ComposeActionButton">
-                                        <Label resid="ActionButton.Label"/>
-                                        <Supertip>
-                                            <Title resid="ActionButton.Label"/>
-                                            <Description resid="ActionButton.Tooltip"/>
-                                        </Supertip>
-                                        <Icon>
-                                            <bt:Image size="16" resid="Icon.16x16"/>
-                                            <bt:Image size="32" resid="Icon.32x32"/>
-                                            <bt:Image size="80" resid="Icon.80x80"/>
-                                        </Icon>
-                                        <Action xsi:type="ExecuteFunction">
-                                            <FunctionName>action</FunctionName>
-                                        </Action>
-                                    </Control>
-
-                                </Group>
-                            </OfficeTab>
-                        </ExtensionPoint>
-
-                        <!-- Extension Point: Events (LaunchEvent) - Web only -->
-                        <ExtensionPoint xsi:type="LaunchEvent">
-                            <LaunchEvents>
-                                <LaunchEvent Type="OnNewMessageCompose" FunctionName="onNewMessageComposeHandler"/>
-                                <LaunchEvent Type="OnMessageSend" FunctionName="onMessageSendHandler" SendMode="PromptUser"/>
-                                <LaunchEvent Type="OnMessageRecipientsChanged" FunctionName="onRecipientsChangedHandler"/>
-                                <LaunchEvent Type="OnMessageFromChanged" FunctionName="onFromChangedHandler"/>
-                            </LaunchEvents>
-                            <SourceLocation resid="Taskpane.Url"/>
-                        </ExtensionPoint>
-
-                    </DesktopFormFactor>
-
-                </Host>
-            </Hosts>
-
-            <!-- Resources -->
-            <Resources>
-                <bt:Images>
-                    <bt:Image id="Icon.16x16" DefaultValue="https://jamesladd.github.io/aladdin/assets/icon-16.png"/>
-                    <bt:Image id="Icon.32x32" DefaultValue="https://jamesladd.github.io/aladdin/assets/icon-32.png"/>
-                    <bt:Image id="Icon.80x80" DefaultValue="https://jamesladd.github.io/aladdin/assets/icon-80.png"/>
-                </bt:Images>
-                <bt:Urls>
-                    <bt:Url id="Commands.Url" DefaultValue="https://jamesladd.github.io/aladdin/commands.html"/>
-                    <bt:Url id="Taskpane.Url" DefaultValue="https://jamesladd.github.io/aladdin/taskpane.html"/>
-                    <bt:Url id="Runtime.Url" DefaultValue="https://jamesladd.github.io/aladdin/runtime.js"/>
-                </bt:Urls>
-                <bt:ShortStrings>
-                    <bt:String id="GroupLabel" DefaultValue="Aladdin"/>
-                    <bt:String id="TaskpaneButton.Label" DefaultValue="Show Taskpane"/>
-                    <bt:String id="ActionButton.Label" DefaultValue="Perform Action"/>
-                </bt:ShortStrings>
-                <bt:LongStrings>
-                    <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Opens the Aladdin taskpane"/>
-                    <bt:String id="ActionButton.Tooltip" DefaultValue="Executes an action command"/>
-                </bt:LongStrings>
-            </Resources>
-
-        </VersionOverrides>
     </VersionOverrides>
 
 </OfficeApp>
