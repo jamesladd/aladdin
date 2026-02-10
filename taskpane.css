@@ -39,7 +39,7 @@ body {
     font-size: 14px;
     opacity: 0.9;
     font-weight: 400;
-    margin-top: 4px;
+    margin-bottom: 4px;
 }
 
 .section-title {
@@ -83,10 +83,10 @@ body {
 }
 
 .event-details {
-    font-size: 12px;
+    font-size: 13px;
     color: #666;
     background: #f9f9f9;
-    padding: 10px;
+    padding: 8px;
     border-radius: 4px;
     font-family: 'Courier New', monospace;
     white-space: pre-wrap;
@@ -102,25 +102,6 @@ body {
     font-style: italic;
 }
 
-/* Scrollbar styling for event details */
-.event-details::-webkit-scrollbar {
-    width: 6px;
-}
-
-.event-details::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 3px;
-}
-
-.event-details::-webkit-scrollbar-thumb {
-    background: #888;
-    border-radius: 3px;
-}
-
-.event-details::-webkit-scrollbar-thumb:hover {
-    background: #555;
-}
-
 /* Responsive adjustments */
 @media (max-width: 480px) {
     .container {
@@ -133,10 +114,5 @@ body {
 
     .user-name {
         font-size: 16px;
-    }
-
-    .event-details {
-        font-size: 11px;
-        max-height: 200px;
     }
 }
