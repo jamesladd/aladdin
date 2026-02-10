@@ -86,7 +86,7 @@ body {
     font-size: 12px;
     color: #666;
     background: #f9f9f9;
-    padding: 8px;
+    padding: 10px;
     border-radius: 4px;
     font-family: 'Courier New', monospace;
     white-space: pre-wrap;
@@ -108,17 +108,17 @@ body {
 }
 
 .event-details::-webkit-scrollbar-track {
-    background: #f0f0f0;
+    background: #f1f1f1;
     border-radius: 3px;
 }
 
 .event-details::-webkit-scrollbar-thumb {
-    background: #ccc;
+    background: #888;
     border-radius: 3px;
 }
 
 .event-details::-webkit-scrollbar-thumb:hover {
-    background: #999;
+    background: #555;
 }
 
 /* Responsive adjustments */
