@@ -13,8 +13,22 @@
 </head>
 <body>
 <div class="container">
-    <div id="status">Loading...</div>
-    <div id="events" class="events"></div>
+    <div class="status-section">
+        <div id="status" class="status">Loading...</div>
+    </div>
+
+    <div class="user-info">
+        <div class="user-name" id="userName">Loading...</div>
+        <div class="platform" id="platform">Loading...</div>
+        <div class="version" id="version">Loading...</div>
+    </div>
+
+    <div class="events-section">
+        <h2 class="section-title">Recent Events</h2>
+        <div id="events" class="events">
+            <div class="no-events">Loading events...</div>
+        </div>
+    </div>
 </div>
 
 <!-- Load runtime.js as a module AFTER Office.js -->

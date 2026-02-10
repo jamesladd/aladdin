@@ -7,6 +7,7 @@ you MUST not add code that was not requested.
 You MUST make sure that the Add-in works in both Outlook Web and Desktop.
 You need to support Taskpane.
 You do not need to support Commands.
+You MUST put UI related functions into the aladdin.js file. Do not create a taskpane.js file.
 
 When responding to a request you MUST describe what you did in detail and why you did it, and include the full file
 sources for changed or new files.
@@ -237,4 +238,4 @@ Update the files to enable the addin to do the following:
 8. Get the Office context platform and show that after the name of the current user.
 9. Get the Office version and show that after the platform.
 10. Capture the selected email item headers, categories and flags, including the To, From, CC and attachment information.
-
+11. Do not create a poll for changes for e.g. setInterval. Assume the regular raising of events keep things in sync.
