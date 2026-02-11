@@ -245,6 +245,7 @@ Update the files to enable the addin to do the following:
 13. Check for getAsync before using async methods to get item fields: To, From, Subject, CC, categories and flags; and use async if available.
 14. You MUST register event handlers at the correct API level: use Office.context.mailbox.addHandlerAsync() for mailbox-level events (ItemChanged, OfficeThemeChanged) and use Office.context.mailbox.item.addHandlerAsync() for item-level events (RecipientsChanged, AttachmentsChanged, RecurrenceChanged, AppointmentTimeChanged, EnhancedLocationsChanged), and you MUST check that Office.context.mailbox.item exists before attempting to register item-level event handlers.
 15. Your MUST only register events that are actually supported by the Outlook Javascript API.
-16. When email item is selected its item id should be kept it as the _currentItemId in the instance not the state.
-17. You MUST track when an email items is selected and when it is deselected.
+16. When an email item is selected its item id should be kept it as the _currentItemId in the instance not the state.
+17. Before the _currentItemId is changed the item in the state with the _currentItemId must be logged to the console with JSON.stringify.
+18. When the add-in is initialized a new category with the displayName "InboxAgent" and the color #009999 must be added to the list of masterCategories.
 

@@ -19,9 +19,12 @@ function aladdin(Office) {
     _currentItemId: null,
     _state: {
       events: [],
-      userName: '',
-      platform: '',
-      officeVersion: '',
+      items: {},
+      userInfo: {
+        name: '',
+        platform: '',
+        version: ''
+      }
     },
 
     state() {
@@ -30,156 +33,139 @@ function aladdin(Office) {
 
     saveState() {
       try {
-        const stateJson = JSON.stringify(this._state)
-        localStorage.setItem('aladdin_state', stateJson)
-        console.log('State saved:', this._state)
-      } catch (error) {
-        console.error('Error saving state:', error)
+        localStorage.setItem('aladdin-state', JSON.stringify(this._state))
+      } catch (e) {
+        console.error('Failed to save state:', e)
       }
     },
 
     loadState() {
       try {
-        const stateJson = localStorage.getItem('aladdin_state')
-        if (stateJson) {
-          const loadedState = JSON.parse(stateJson)
-          this._state = { ...this._state, ...loadedState }
-          console.log('State loaded:', this._state)
+        const saved = localStorage.getItem('aladdin-state')
+        if (saved) {
+          const parsed = JSON.parse(saved)
+          this._state = { ...this._state, ...parsed }
           this.updateUI()
         }
-      } catch (error) {
-        console.error('Error loading state:', error)
+      } catch (e) {
+        console.error('Failed to load state:', e)
       }
     },
 
     watchState() {
-      if (typeof window !== 'undefined') {
-        window.addEventListener('storage', (e) => {
-          if (e.key === 'aladdin_state' && e.newValue) {
-            try {
-              const newState = JSON.parse(e.newValue)
-              this._state = { ...this._state, ...newState }
-              console.log('State updated from storage:', this._state)
-              this.updateUI()
-            } catch (error) {
-              console.error('Error watching state:', error)
-            }
+      if (typeof window === 'undefined') return
+
+      window.addEventListener('storage', (e) => {
+        if (e.key === 'aladdin-state' && e.newValue) {
+          try {
+            const parsed = JSON.parse(e.newValue)
+            this._state = { ...this._state, ...parsed }
+            this.updateUI()
+          } catch (err) {
+            console.error('Failed to parse storage event:', err)
           }
-        })
-      }
+        }
+      })
     },
 
     event(name, details) {
       const timestamp = new Date().toISOString()
-      const eventData = {
+      const eventEntry = {
         name,
         details,
         timestamp
       }
 
       // Keep only last 10 events, most recent first
-      this._state.events.unshift(eventData)
+      this._state.events.unshift(eventEntry)
       if (this._state.events.length > 10) {
         this._state.events = this._state.events.slice(0, 10)
       }
 
-      console.log('Event recorded:', eventData)
       this.saveState()
       this.updateUI()
     },
 
-    updateUI() {
-      this.renderUserInfo()
-      this.renderEvents()
-    },
-
-    renderUserInfo() {
-      const userInfoDiv = document.getElementById('user-info')
-      if (userInfoDiv) {
-        userInfoDiv.innerHTML = `
-          <div class="user-name">${this._state.userName || 'Loading...'}</div>
-          <div class="platform">Platform: ${this._state.platform || 'Loading...'}</div>
-          <div class="office-version">Office Version: ${this._state.officeVersion || 'Loading...'}</div>
-        `
-      }
-    },
-
-    renderEvents() {
-      const eventsDiv = document.getElementById('events')
-      if (!eventsDiv) return
-
-      if (this._state.events.length === 0) {
-        eventsDiv.innerHTML = '<div class="no-events">No events recorded yet</div>'
-        return
-      }
-
-      const eventsHtml = this._state.events.map(event => `
-        <div class="event-item">
-          <div class="event-name">${this.escapeHtml(event.name)}</div>
-          <div class="event-timestamp">${new Date(event.timestamp).toLocaleString()}</div>
-          <div class="event-details">${this.escapeHtml(JSON.stringify(event.details, null, 2))}</div>
-        </div>
-      `).join('')
-
-      eventsDiv.innerHTML = eventsHtml
-    },
-
-    escapeHtml(text) {
-      const div = document.createElement('div')
-      div.textContent = text
-      return div.innerHTML
-    },
-
     async initialize() {
-      console.log('Initializing Aladdin...')
+      console.log('Aladdin initializing...')
 
-      // Get user context information
-      await this.loadUserContext()
+      // Get user information
+      await this.getUserInfo()
 
-      // Register all event handlers
+      // Add InboxAgent category
+      await this.addInboxAgentCategory()
+
+      // Register event handlers
       this.registerEventHandlers()
 
-      // Load current item if available
+      // Get current item if one is selected
       if (this.Office.context.mailbox.item) {
-        await this.handleItemChanged()
+        await this.captureCurrentItem()
       }
 
       this.updateUI()
+      console.log('Aladdin initialized')
     },
 
-    async loadUserContext() {
+    async getUserInfo() {
       try {
-        // Get user name
         const userProfile = this.Office.context.mailbox.userProfile
-        this._state.userName = userProfile.displayName || userProfile.emailAddress || 'Unknown User'
+        this._state.userInfo.name = userProfile.displayName || userProfile.emailAddress || 'Unknown User'
 
-        // Get platform
-        this._state.platform = this.Office.context.platform || 'Unknown Platform'
+        const platform = this.Office.context.platform
+        const platformNames = {
+          [this.Office.PlatformType.PC]: 'Windows Desktop',
+          [this.Office.PlatformType.Mac]: 'Mac Desktop',
+          [this.Office.PlatformType.OfficeOnline]: 'Office Online',
+          [this.Office.PlatformType.iOS]: 'iOS',
+          [this.Office.PlatformType.Android]: 'Android'
+        }
+        this._state.userInfo.platform = platformNames[platform] || 'Unknown Platform'
 
-        // Get Office version
-        this._state.officeVersion = this.Office.context.diagnostics?.version || 'Unknown Version'
-
-        this.event('UserContextLoaded', {
-          userName: this._state.userName,
-          platform: this._state.platform,
-          officeVersion: this._state.officeVersion
-        })
+        const diagnostics = this.Office.context.diagnostics
+        this._state.userInfo.version = diagnostics.version || 'Unknown Version'
 
         this.saveState()
-      } catch (error) {
-        console.error('Error loading user context:', error)
+        this.event('UserInfo', this._state.userInfo)
+      } catch (e) {
+        console.error('Failed to get user info:', e)
+      }
+    },
+
+    async addInboxAgentCategory() {
+      try {
+        const mailbox = this.Office.context.mailbox
+        if (mailbox.masterCategories && mailbox.masterCategories.addAsync) {
+          mailbox.masterCategories.addAsync(
+            [
+              {
+                displayName: 'InboxAgent',
+                color: this.Office.MailboxEnums.CategoryColor.Preset9 // Closest to #009999
+              }
+            ],
+            (result) => {
+              if (result.status === this.Office.AsyncResultStatus.Succeeded) {
+                this.event('CategoryAdded', { name: 'InboxAgent', color: '#009999' })
+              } else {
+                console.warn('Failed to add category:', result.error)
+              }
+            }
+          )
+        }
+      } catch (e) {
+        console.error('Failed to add InboxAgent category:', e)
       }
     },
 
     registerEventHandlers() {
       const mailbox = this.Office.context.mailbox
 
-      // Mailbox-level events - register on mailbox
+      // Mailbox-level events
       if (mailbox.addHandlerAsync) {
-        // ItemChanged - when user selects different item
+        // ItemChanged - when user selects a different item
         mailbox.addHandlerAsync(
           this.Office.EventType.ItemChanged,
-          () => this.handleItemChanged(),
+          () => this.onItemChanged(),
           (result) => {
             if (result.status === this.Office.AsyncResultStatus.Succeeded) {
               console.log('ItemChanged handler registered')
@@ -187,268 +173,278 @@ function aladdin(Office) {
           }
         )
 
-        // OfficeThemeChanged - when Office theme changes
-        if (this.Office.EventType.OfficeThemeChanged) {
-          mailbox.addHandlerAsync(
-            this.Office.EventType.OfficeThemeChanged,
-            (args) => this.event('OfficeThemeChanged', args),
+        // OfficeThemeChanged
+        mailbox.addHandlerAsync(
+          this.Office.EventType.OfficeThemeChanged,
+          (args) => this.event('OfficeThemeChanged', args),
+          (result) => {
+            if (result.status === this.Office.AsyncResultStatus.Succeeded) {
+              console.log('OfficeThemeChanged handler registered')
+            }
+          }
+        )
+      }
+
+      // Item-level events - only if item exists
+      this.registerItemEventHandlers()
+    },
+
+    registerItemEventHandlers() {
+      const item = this.Office.context.mailbox.item
+      if (!item || !item.addHandlerAsync) return
+
+      const itemEvents = [
+        'RecipientsChanged',
+        'AttachmentsChanged',
+        'RecurrenceChanged',
+        'AppointmentTimeChanged',
+        'EnhancedLocationsChanged'
+      ]
+
+      itemEvents.forEach(eventType => {
+        if (this.Office.EventType[eventType]) {
+          item.addHandlerAsync(
+            this.Office.EventType[eventType],
+            (args) => {
+              this.event(eventType, args)
+              // Re-capture item on changes
+              this.captureCurrentItem()
+            },
             (result) => {
               if (result.status === this.Office.AsyncResultStatus.Succeeded) {
-                console.log('OfficeThemeChanged handler registered')
+                console.log(`${eventType} handler registered`)
               }
             }
           )
         }
-      }
-
-      // Item-level events - register on item if available
-      this.registerItemLevelEvents()
+      })
     },
 
-    registerItemLevelEvents() {
-      const item = this.Office.context.mailbox.item
-      if (!item || !item.addHandlerAsync) return
+    async onItemChanged() {
+      this.event('ItemChanged', { previousItemId: this._currentItemId })
 
-      // RecipientsChanged - when To, CC, or BCC recipients change
-      if (this.Office.EventType.RecipientsChanged) {
-        item.addHandlerAsync(
-          this.Office.EventType.RecipientsChanged,
-          (args) => {
-            this.event('RecipientsChanged', {
-              type: args.changedRecipientFields,
-              itemId: this._currentItemId
-            })
-            this.captureItemFields()
-          },
-          (result) => {
-            if (result.status === this.Office.AsyncResultStatus.Succeeded) {
-              console.log('RecipientsChanged handler registered')
-            }
-          }
-        )
+      // Log the previous item before changing
+      if (this._currentItemId && this._state.items[this._currentItemId]) {
+        console.log('Previous item data:', JSON.stringify(this._state.items[this._currentItemId], null, 2))
       }
 
-      // AttachmentsChanged - when attachments are added or removed
-      if (this.Office.EventType.AttachmentsChanged) {
-        item.addHandlerAsync(
-          this.Office.EventType.AttachmentsChanged,
-          (args) => {
-            this.event('AttachmentsChanged', {
-              attachmentStatus: args.attachmentStatus,
-              attachmentDetails: args.attachmentDetails,
-              itemId: this._currentItemId
-            })
-            this.captureItemFields()
-          },
-          (result) => {
-            if (result.status === this.Office.AsyncResultStatus.Succeeded) {
-              console.log('AttachmentsChanged handler registered')
-            }
-          }
-        )
-      }
+      // Register handlers for new item
+      this.registerItemEventHandlers()
 
-      // RecurrenceChanged - when recurrence pattern changes (for appointments)
-      if (this.Office.EventType.RecurrenceChanged) {
-        item.addHandlerAsync(
-          this.Office.EventType.RecurrenceChanged,
-          (args) => {
-            this.event('RecurrenceChanged', {
-              recurrence: args.recurrence,
-              itemId: this._currentItemId
-            })
-          },
-          (result) => {
-            if (result.status === this.Office.AsyncResultStatus.Succeeded) {
-              console.log('RecurrenceChanged handler registered')
-            }
-          }
-        )
-      }
-
-      // AppointmentTimeChanged - when appointment time changes
-      if (this.Office.EventType.AppointmentTimeChanged) {
-        item.addHandlerAsync(
-          this.Office.EventType.AppointmentTimeChanged,
-          (args) => {
-            this.event('AppointmentTimeChanged', {
-              start: args.start,
-              end: args.end,
-              itemId: this._currentItemId
-            })
-          },
-          (result) => {
-            if (result.status === this.Office.AsyncResultStatus.Succeeded) {
-              console.log('AppointmentTimeChanged handler registered')
-            }
-          }
-        )
-      }
-
-      // EnhancedLocationsChanged - when enhanced locations change
-      if (this.Office.EventType.EnhancedLocationsChanged) {
-        item.addHandlerAsync(
-          this.Office.EventType.EnhancedLocationsChanged,
-          (args) => {
-            this.event('EnhancedLocationsChanged', {
-              enhancedLocations: args.enhancedLocations,
-              itemId: this._currentItemId
-            })
-          },
-          (result) => {
-            if (result.status === this.Office.AsyncResultStatus.Succeeded) {
-              console.log('EnhancedLocationsChanged handler registered')
-            }
-          }
-        )
-      }
+      // Capture new item
+      await this.captureCurrentItem()
     },
 
-    async handleItemChanged() {
+    async captureCurrentItem() {
       const item = this.Office.context.mailbox.item
-
-      // Check if item was deselected
       if (!item) {
-        if (this._currentItemId) {
-          this.event('ItemDeselected', {
-            previousItemId: this._currentItemId
-          })
-          this._currentItemId = null
-        }
+        this._currentItemId = null
         return
       }
 
-      // Check if this is a new item selection
-      const newItemId = item.itemId
-      const isNewSelection = this._currentItemId !== newItemId
+      const itemId = item.itemId || `temp-${Date.now()}`
 
-      if (isNewSelection) {
-        const previousItemId = this._currentItemId
-        this._currentItemId = newItemId
-
-        this.event('ItemSelected', {
-          itemId: this._currentItemId,
-          previousItemId: previousItemId,
-          itemType: item.itemType
-        })
-
-        // Register item-level events for the new item
-        this.registerItemLevelEvents()
-
-        // Capture all fields of the selected item
-        await this.captureItemFields()
+      // Log previous item if changing
+      if (this._currentItemId && this._currentItemId !== itemId && this._state.items[this._currentItemId]) {
+        console.log('Previous item data:', JSON.stringify(this._state.items[this._currentItemId], null, 2))
       }
+
+      this._currentItemId = itemId
+
+      const itemData = {
+        itemId,
+        itemType: item.itemType,
+        subject: await this.getItemField('subject'),
+        from: await this.getItemField('from'),
+        to: await this.getItemField('to'),
+        cc: await this.getItemField('cc'),
+        categories: await this.getItemField('categories'),
+        conversationId: item.conversationId,
+        dateTimeCreated: item.dateTimeCreated?.toISOString(),
+        dateTimeModified: item.dateTimeModified?.toISOString(),
+        internetMessageId: item.internetMessageId,
+        normalizedSubject: item.normalizedSubject,
+        capturedAt: new Date().toISOString()
+      }
+
+      // Get flags
+      if (item.getAsync) {
+        itemData.flags = await this.getFlags(item)
+      }
+
+      // Get attachments
+      itemData.attachments = this.getAttachmentInfo(item)
+
+      // Get internet headers
+      itemData.headers = await this.getInternetHeaders(item)
+
+      this._state.items[itemId] = itemData
+      this.saveState()
+      this.event('ItemCaptured', { itemId, subject: itemData.subject })
     },
 
-    async captureItemFields() {
+    async getItemField(fieldName) {
       const item = this.Office.context.mailbox.item
-      if (!item) return
+      if (!item) return null
 
-      try {
-        const fields = {
-          itemId: this._currentItemId,
-          itemType: item.itemType
-        }
+      const field = item[fieldName]
+      if (!field) return null
 
-        // Use async methods if available, otherwise use sync
-        if (item.subject && item.subject.getAsync) {
-          // Async API available
-          await Promise.all([
-            this.getAsyncValue(item.subject, 'subject', fields),
-            this.getAsyncValue(item.to, 'to', fields),
-            this.getAsyncValue(item.from, 'from', fields),
-            this.getAsyncValue(item.cc, 'cc', fields),
-            this.getAsyncValue(item.categories, 'categories', fields),
-          ])
-        } else {
-          // Fallback to sync API
-          fields.subject = item.subject || ''
-          fields.to = item.to || []
-          fields.from = item.from || {}
-          fields.cc = item.cc || []
-          fields.categories = item.categories || []
-        }
-
-        // Get flags (sync property)
-        if (item.itemType === this.Office.MailboxEnums.ItemType.Message) {
-          fields.flags = {
-            importance: item.importance,
-            sensitivity: item.sensitivity
-          }
-        }
-
-        // Get attachments
-        fields.attachments = (item.attachments || []).map(att => ({
-          id: att.id,
-          name: att.name,
-          attachmentType: att.attachmentType,
-          size: att.size,
-          contentType: att.contentType,
-          isInline: att.isInline
-        }))
-
-        // Get internet headers
-        if (item.getAllInternetHeadersAsync) {
-          await new Promise((resolve) => {
-            item.getAllInternetHeadersAsync((result) => {
-              if (result.status === this.Office.AsyncResultStatus.Succeeded) {
-                fields.headers = this.parseInternetHeaders(result.value)
-              }
-              resolve()
-            })
+      // Check if getAsync is available for this field
+      if (field.getAsync && typeof field.getAsync === 'function') {
+        return new Promise((resolve) => {
+          field.getAsync((result) => {
+            if (result.status === this.Office.AsyncResultStatus.Succeeded) {
+              resolve(this.formatFieldValue(result.value))
+            } else {
+              resolve(null)
+            }
           })
-        }
-
-        this.event('ItemFieldsCaptured', fields)
-      } catch (error) {
-        console.error('Error capturing item fields:', error)
-        this.event('ItemFieldsCaptureError', { error: error.message })
+        })
+      } else {
+        // Use direct property access
+        return this.formatFieldValue(field)
       }
     },
 
-    async getAsyncValue(property, fieldName, targetObject) {
-      if (!property || !property.getAsync) return
+    formatFieldValue(value) {
+      if (!value) return null
+
+      // Handle EmailAddressDetails array
+      if (Array.isArray(value)) {
+        return value.map(v => {
+          if (v.emailAddress) {
+            return {
+              name: v.displayName || '',
+              email: v.emailAddress
+            }
+          }
+          return v
+        })
+      }
+
+      // Handle single EmailAddressDetails
+      if (value.emailAddress) {
+        return {
+          name: value.displayName || '',
+          email: value.emailAddress
+        }
+      }
+
+      return value
+    },
+
+    async getFlags(item) {
+      if (!item.getAsync) return null
 
       return new Promise((resolve) => {
-        property.getAsync((result) => {
+        item.getAsync((result) => {
           if (result.status === this.Office.AsyncResultStatus.Succeeded) {
-            targetObject[fieldName] = result.value
+            const value = result.value
+            resolve({
+              flagStatus: value.flagStatus,
+              startDate: value.startDate?.toISOString(),
+              dueDate: value.dueDate?.toISOString(),
+              completeDate: value.completeDate?.toISOString()
+            })
+          } else {
+            resolve(null)
           }
-          resolve()
+        })
+      })
+    },
+
+    getAttachmentInfo(item) {
+      if (!item.attachments || item.attachments.length === 0) return []
+
+      return item.attachments.map(att => ({
+        id: att.id,
+        name: att.name,
+        attachmentType: att.attachmentType,
+        size: att.size,
+        contentType: att.contentType,
+        isInline: att.isInline
+      }))
+    },
+
+    async getInternetHeaders(item) {
+      if (!item.getAllInternetHeadersAsync) return null
+
+      return new Promise((resolve) => {
+        item.getAllInternetHeadersAsync((result) => {
+          if (result.status === this.Office.AsyncResultStatus.Succeeded) {
+            const headersString = result.value
+            const headersObj = this.parseInternetHeaders(headersString)
+            resolve(headersObj)
+          } else {
+            resolve(null)
+          }
         })
       })
     },
 
     parseInternetHeaders(headersString) {
+      if (!headersString) return {}
+
       const headers = {}
-      if (!headersString) return headers
-
-      const lines = headersString.split('\r\n')
+      const lines = headersString.split('\n')
       let currentKey = null
-      let currentValue = ''
 
-      for (const line of lines) {
+      for (let line of lines) {
+        // Check if line starts with whitespace (continuation of previous header)
         if (line.match(/^\s/) && currentKey) {
-          // Continuation of previous header
-          currentValue += ' ' + line.trim()
-        } else if (line.includes(':')) {
-          // Save previous header if exists
-          if (currentKey) {
-            headers[currentKey] = currentValue.trim()
-          }
-          // Start new header
+          headers[currentKey] += ' ' + line.trim()
+        } else {
+          // New header
           const colonIndex = line.indexOf(':')
-          currentKey = line.substring(0, colonIndex).trim()
-          currentValue = line.substring(colonIndex + 1).trim()
+          if (colonIndex > 0) {
+            currentKey = line.substring(0, colonIndex).trim()
+            const value = line.substring(colonIndex + 1).trim()
+            headers[currentKey] = value
+          }
         }
       }
 
-      // Save last header
-      if (currentKey) {
-        headers[currentKey] = currentValue.trim()
+      return headers
+    },
+
+    updateUI() {
+      if (typeof document === 'undefined') return
+
+      // Update user info
+      const statusDiv = document.getElementById('status')
+      if (statusDiv) {
+        statusDiv.innerHTML = `
+          <div class="user-info">
+            <div class="user-name">${this._state.userInfo.name}</div>
+            <div class="platform">Platform: ${this._state.userInfo.platform}</div>
+            <div class="platform">Version: ${this._state.userInfo.version}</div>
+          </div>
+        `
       }
 
-      return headers
+      // Update events list
+      const eventsDiv = document.getElementById('events')
+      if (eventsDiv) {
+        if (this._state.events.length === 0) {
+          eventsDiv.innerHTML = '<div class="no-events">No events yet</div>'
+        } else {
+          eventsDiv.innerHTML = this._state.events.map(event => `
+            <div class="event-item">
+              <div class="event-name">${this.escapeHtml(event.name)}</div>
+              <div class="event-timestamp">${new Date(event.timestamp).toLocaleString()}</div>
+              <div class="event-details">${this.escapeHtml(JSON.stringify(event.details, null, 2))}</div>
+            </div>
+          `).join('')
+        }
+      }
+    },
+
+    escapeHtml(text) {
+      if (typeof text !== 'string') return text
+      const div = document.createElement('div')
+      div.textContent = text
+      return div.innerHTML
     }
   }
 }
