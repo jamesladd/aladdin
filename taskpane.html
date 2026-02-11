@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=Edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Aladdin Taskpane</title>
+    <title>InboxAgent Taskpane</title>
 
     <!-- Load Office.js first -->
     <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
@@ -13,9 +13,15 @@
 </head>
 <body>
 <div class="container">
-    <div id="status">Loading...</div>
+    <div id="user-info" class="user-info">
+        <div class="user-name">Loading...</div>
+        <div class="platform">Platform: Unknown</div>
+        <div class="platform">Version: Unknown</div>
+    </div>
     <div class="section-title">Recent Events</div>
-    <div id="events" class="events"></div>
+    <div id="events" class="events">
+        <div class="no-events">Loading...</div>
+    </div>
 </div>
 
 <!-- Load runtime.js as a module AFTER Office.js -->

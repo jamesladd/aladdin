@@ -83,7 +83,7 @@ function initializeRuntime() {
 // Call initialization
 initializeRuntime()
 
-You MUST start with the following tasskpane.html and modify it to achieve the requested outcomes:
+You MUST start with the following taskpane.html and modify it to achieve the requested outcomes:
 
 <!DOCTYPE html>
 <html>
@@ -91,7 +91,7 @@ You MUST start with the following tasskpane.html and modify it to achieve the re
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=Edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Aladdin Taskpane</title>
+    <title>InboxAgent Taskpane</title>
 
     <!-- Load Office.js first -->
     <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
@@ -101,6 +101,7 @@ You MUST start with the following tasskpane.html and modify it to achieve the re
 <body>
 <div class="container">
     <div id="status">Loading...</div>
+    <div class="section-title">Recent Events</div>
     <div id="events" class="events"></div>
 </div>
 
@@ -110,6 +111,8 @@ You MUST start with the following tasskpane.html and modify it to achieve the re
 </html>
 
 You MUST start with the following taskpane.css file and modify it to achieve the reuqested outcomes:
+
+/* taskpane.css */
 
 /* taskpane.css */
 
@@ -152,6 +155,7 @@ body {
     font-size: 14px;
     opacity: 0.9;
     font-weight: 400;
+    margin-top: 4px;
 }
 
 .section-title {
@@ -203,6 +207,8 @@ body {
     font-family: 'Courier New', monospace;
     white-space: pre-wrap;
     word-break: break-word;
+    max-height: 200px;
+    overflow-y: auto;
 }
 
 .no-events {
@@ -247,5 +253,4 @@ Update the files to enable the addin to do the following:
 15. Your MUST only register events that are actually supported by the Outlook Javascript API.
 16. When an email item is selected its item id should be kept it as the _currentItemId in the instance not the state.
 17. Before the _currentItemId is changed the item in the state with the _currentItemId must be logged to the console with JSON.stringify.
-18. When the add-in is initialized a new category with the displayName "InboxAgent" and the color #009999 must be added to the list of masterCategories.
-
+18. When the add-in is initialized a new category with the displayName "InboxAgent" and the color #f54900 must be added to the list of masterCategories.

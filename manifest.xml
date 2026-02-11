@@ -7,11 +7,11 @@
         xsi:type="MailApp">
 
     <!-- Basic Settings -->
-    <Id>8a8e3d85-8f9d-4b1e-9c3d-7a6b5c4d3e2f</Id>
+    <Id>8a8e3d85-8f9d-4b1e-9c3d-7a6b5c4dbeef</Id>
     <Version>1.44.0.0</Version>
-    <ProviderName>Aladdin A</ProviderName>
+    <ProviderName>Aportio</ProviderName>
     <DefaultLocale>en-US</DefaultLocale>
-    <DisplayName DefaultValue="Aladdin Mail Tracker"/>
+    <DisplayName DefaultValue="InboxAgent"/>
     <Description DefaultValue="Tracks email events and displays user activity"/>
     <IconUrl DefaultValue="https://jamesladd.github.io/aladdin/assets/icon-64.png"/>
     <HighResolutionIconUrl DefaultValue="https://jamesladd.github.io/aladdin/assets/icon-128.png"/>
@@ -24,7 +24,7 @@
 
     <Requirements>
         <Sets>
-            <Set Name="Mailbox" MinVersion="1.1"/>
+            <Set Name="Mailbox" MinVersion="1.8"/>
         </Sets>
     </Requirements>
 
@@ -55,7 +55,7 @@
     <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides" xsi:type="VersionOverridesV1_0">
 
         <Requirements>
-            <bt:Sets DefaultMinVersion="1.5">
+            <bt:Sets DefaultMinVersion="1.8">
                 <bt:Set Name="Mailbox"/>
             </bt:Sets>
         </Requirements>
@@ -82,6 +82,7 @@
                                     </Icon>
                                     <Action xsi:type="ShowTaskpane">
                                         <SourceLocation resid="Taskpane.Url"/>
+                                        <SupportsPinning>true</SupportsPinning>
                                     </Action>
                                 </Control>
                             </Group>
@@ -105,6 +106,7 @@
                                     </Icon>
                                     <Action xsi:type="ShowTaskpane">
                                         <SourceLocation resid="Taskpane.Url"/>
+                                        <SupportsPinning>true</SupportsPinning>
                                     </Action>
                                 </Control>
                             </Group>
