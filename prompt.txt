@@ -239,11 +239,12 @@ Update the files to enable the addin to do the following:
 7. Get the name of the current user and show it as the first entry in the Taskpane.
 8. Get the Office context platform and show that after the name of the current user.
 9. Get the Office version and show that after the platform.
-10. Capture the selected email item headers - categories and flags, including the To, From, CC, Subject and attachment information.
+10. Capture the selected email item fields: headers, categories, flags, To, From, CC, Subject and attachment information.
 11. Capture the raw email headers with Office context mailbox item getAllInternetHeadersAsync, and convert the string into key/value pairs.
 12. Do not create a poll for changes for e.g. setInterval. Assume the regular raising of events keep things in sync.
-13. Check for getAsync before using async methods to get recipient properties like To, From, Subject and CC; and use async if available.
+13. Check for getAsync before using async methods to get item fields: To, From, Subject, CC, categories and flags; and use async if available.
 14. You MUST register event handlers at the correct API level: use Office.context.mailbox.addHandlerAsync() for mailbox-level events (ItemChanged, OfficeThemeChanged) and use Office.context.mailbox.item.addHandlerAsync() for item-level events (RecipientsChanged, AttachmentsChanged, RecurrenceChanged, AppointmentTimeChanged, EnhancedLocationsChanged), and you MUST check that Office.context.mailbox.item exists before attempting to register item-level event handlers.
 15. Your MUST only register events that are actually supported by the Outlook Javascript API.
 16. When email item is selected its item id should be kept it as the _currentItemId in the instance not the state.
 17. You MUST track when an email items is selected and when it is deselected.
+
