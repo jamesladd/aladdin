@@ -20,6 +20,21 @@ body {
     margin: 0 auto;
 }
 
+#status {
+    font-size: 12px;
+    color: #999;
+    margin-bottom: 15px;
+    padding: 5px 10px;
+    border-radius: 4px;
+    background: #eee;
+    display: inline-block;
+}
+
+.status-active {
+    background: #e6f9e6 !important;
+    color: #2d7a2d !important;
+}
+
 .user-info {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
@@ -29,24 +44,26 @@ body {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.user-name {
-    font-size: 18px;
+.info-row {
+    display: flex;
+    align-items: baseline;
+    margin-bottom: 6px;
+}
+
+.info-row:last-child {
+    margin-bottom: 0;
+}
+
+.info-label {
     font-weight: 600;
-    margin-bottom: 8px;
+    min-width: 80px;
+    font-size: 13px;
 }
 
-.folder-name {
-    font-size: 14px;
-    opacity: 0.9;
-    font-weight: 400;
-    margin-top: 4px;
-}
-
-.platform {
-    font-size: 14px;
-    opacity: 0.9;
-    font-weight: 400;
-    margin-top: 4px;
+.info-value {
+    font-size: 13px;
+    opacity: 0.95;
+    word-break: break-word;
 }
 
 .section-title {
@@ -57,46 +74,60 @@ body {
 }
 
 .current-email {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
     margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .email-detail {
-    background: white;
-    padding: 15px;
-    border-radius: 6px;
-    border-left: 4px solid #764ba2;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    margin-bottom: 10px;
-}
-
-.email-field {
-    margin-bottom: 6px;
+    margin-bottom: 8px;
     font-size: 13px;
 }
 
-.email-field-label {
+.email-detail .info-label {
+    color: #667eea;
     font-weight: 600;
-    color: #764ba2;
-    display: inline;
+    min-width: 90px;
+    display: inline-block;
 }
 
-.email-field-value {
-    color: #444;
-    display: inline;
+.email-detail .info-value {
+    color: #333;
+    opacity: 1;
 }
 
-.email-headers {
-    font-size: 12px;
-    color: #666;
+.no-email {
+    text-align: center;
+    color: #999;
+    padding: 20px;
+    font-style: italic;
+}
+
+.headers-container {
+    max-height: 200px;
+    overflow-y: auto;
     background: #f9f9f9;
     padding: 8px;
     border-radius: 4px;
-    font-family: 'Courier New', monospace;
-    white-space: pre-wrap;
-    word-break: break-word;
-    max-height: 200px;
-    overflow-y: auto;
-    margin-top: 8px;
+    margin-top: 4px;
+}
+
+.header-item {
+    font-size: 11px;
+    margin-bottom: 2px;
+    word-break: break-all;
+    line-height: 1.4;
+}
+
+.header-key {
+    font-weight: 600;
+    color: #555;
+}
+
+.header-value {
+    color: #777;
 }
 
 .events {
@@ -162,7 +193,11 @@ body {
         padding: 15px;
     }
 
-    .user-name {
-        font-size: 16px;
+    .info-row {
+        flex-direction: column;
+    }
+
+    .info-label {
+        min-width: auto;
     }
 }

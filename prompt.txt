@@ -10,7 +10,7 @@ You do not need to support Commands.
 You MUST put UI related functions into the aladdin.js file. Do not create a taskpane.js file.
 
 When responding to a request you MUST describe what you did in detail and why you did it, and include the full file
-sources for changed or new files.
+sources for changed or new files only.
 
 You MUST start with the following base aladdin.js file and modify it to achieve the requested outcomes:
 
@@ -575,8 +575,11 @@ Update the files to enable the addin to do the following:
     be stored in state and persisted in localstorage.
 11. LocalStorage should be watched so any activation of the addin can see what the current selected email details are.
 12. When the add-in is initialized call getCategories to get a list of categories that must be added to the list of masterCategories.
+    getCategories should be passed the all the information captured in 2, 3, 4 and 5.
 13. Do not create a poll for changes for e.g. setInterval. Assume the regular raising of events keep things in sync.
 14. Check for getAsync before using async methods to get item fields: To, From, Subject, CC, categories and flags; and use async if available.
 15. You MUST register event handlers at the correct API level: use Office.context.mailbox.addHandlerAsync() for mailbox-level events (ItemChanged, OfficeThemeChanged) and use Office.context.mailbox.item.addHandlerAsync() for item-level events (RecipientsChanged, AttachmentsChanged, RecurrenceChanged, AppointmentTimeChanged, EnhancedLocationsChanged), and you MUST check that Office.context.mailbox.item exists before attempting to register item-level event handlers.
-16. Your MUST only register events that are actually supported by the Outlook Javascript API.
+16. You MUST only register events that are actually supported by the Outlook Javascript API.
+17. You Must only keep the last 10 events.
+18. You log the name of the event passed to the event function to the console.
 

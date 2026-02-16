@@ -13,19 +13,35 @@
 </head>
 <body>
 <div class="container">
-    <div id="user-info" class="user-info">
-        <div id="user-name" class="user-name">Loading...</div>
-        <div id="folder-name" class="folder-name"></div>
-        <div id="platform" class="platform"></div>
-        <div id="version" class="platform"></div>
+    <div id="status">Loading...</div>
+
+    <div class="user-info">
+        <div class="info-row">
+            <span class="info-label">User:</span>
+            <span id="user-name" class="info-value">—</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Folder:</span>
+            <span id="folder-name" class="info-value">—</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Platform:</span>
+            <span id="platform" class="info-value">—</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Version:</span>
+            <span id="version" class="info-value">—</span>
+        </div>
     </div>
+
     <div class="section-title">Current Email</div>
     <div id="current-email" class="current-email">
-        <div class="no-events">No email selected</div>
+        <div class="no-email">No email selected</div>
     </div>
+
     <div class="section-title">Recent Events</div>
     <div id="events" class="events">
-        <div class="no-events">No events recorded</div>
+        <div class="no-events">No events recorded yet</div>
     </div>
 </div>
 
