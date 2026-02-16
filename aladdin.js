@@ -3,7 +3,7 @@
 const singleton = [false]
 const STORAGE_KEY = 'aladdin_state'
 const CATEGORY_INTERVAL_MS = 8 * 60 * 60 * 1000 // 8 hours
-const API_BASE = 'https://jamesladd.github.io/aladdin'
+const API_BASE = 'https://www.devappeggio.com'
 
 export function createAladdin(Office) {
   if (typeof window !== 'undefined' && window.aladdinInstance) return window.aladdinInstance;

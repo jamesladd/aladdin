@@ -8,10 +8,10 @@
 
     <!-- Basic Settings -->
     <Id>8a8e3d85-8f9d-4b1e-9c3d-7a6b5c4dbeef</Id>
-    <Version>1.52.0.0</Version>
+    <Version>1.53.0.0</Version>
     <ProviderName>Aportio</ProviderName>
     <DefaultLocale>en-US</DefaultLocale>
-    <DisplayName DefaultValue="InboxAgent G"/>
+    <DisplayName DefaultValue="InboxAgent H"/>
     <Description DefaultValue="Tracks email events and displays user activity"/>
     <IconUrl DefaultValue="https://jamesladd.github.io/aladdin/assets/icon-64.png"/>
     <HighResolutionIconUrl DefaultValue="https://jamesladd.github.io/aladdin/assets/icon-128.png"/>
