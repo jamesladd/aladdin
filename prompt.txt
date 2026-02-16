@@ -56,7 +56,8 @@ function aladdin(Office) {
     },
     notify() {
     },
-    async getCategories() { // This will be enhanced to make an API call
+    async getCategories() {
+      // Should API call fail, use default below.
       return [
         { displayName: 'InboxAgent', color: '#f54900' }
       ]
@@ -570,12 +571,14 @@ Update the files to enable the addin to do the following:
    f. Raw email headers with Office context mailbox item getAllInternetHeadersAsync, and convert the string into key/value pairs.
 8. When a different email is selected or no email is selected the current captured email information is to be sent to an API
    by calling the notify function.
+   The API end-point for this POST is /api/inboxnotify
 9. When the current email detail has been sent with the notify function the current email details in the state can be deleted.
 10. To ensure that the current email details are available across different activations of the addin the email details should
     be stored in state and persisted in localstorage.
 11. LocalStorage should be watched so any activation of the addin can see what the current selected email details are.
 12. When the add-in is initialized call getCategories to get a list of categories that must be added to the list of masterCategories.
     getCategories should be passed the all the information captured in 2, 3, 4 and 5.
+    The API end-point for this POST is /api/inboxinit
 13. Do not create a poll for changes for e.g. setInterval. Assume the regular raising of events keep things in sync.
 14. Check for getAsync before using async methods to get item fields: To, From, Subject, CC, categories and flags; and use async if available.
 15. You MUST register event handlers at the correct API level: use Office.context.mailbox.addHandlerAsync() for mailbox-level events (ItemChanged, OfficeThemeChanged) and use Office.context.mailbox.item.addHandlerAsync() for item-level events (RecipientsChanged, AttachmentsChanged, RecurrenceChanged, AppointmentTimeChanged, EnhancedLocationsChanged), and you MUST check that Office.context.mailbox.item exists before attempting to register item-level event handlers.
