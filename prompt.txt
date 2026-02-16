@@ -604,3 +604,5 @@ User switches to a different read email (ItemChanged)
 User starts composing (taskpane re-initializes in compose context)
 User navigates away from any email (no item)
 Taskpane re-activates in a different context
+
+Rule R4: The /api/inboxinit POST (called via getCategories() inside _initCategories()) and the subsequent _ensureMasterCategories() call must only execute once every 8 hours. The timestamp of the last successful execution must be persisted in state under _lastCategoryInit and checked at the start of _initCategories(). If less than 8 hours have elapsed since the last execution, the entire _initCategories() method must return early without making any API call or modifying master categories. The 8-hour window must survive across taskpane activations via localStorage persistence.
