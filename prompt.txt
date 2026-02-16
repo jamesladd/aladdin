@@ -591,9 +591,12 @@ Update the files to enable the addin to do the following:
 18. You Must only keep the last 10 events.
 19. You log the name of the event passed to the event function to the console.
 
-Rule R1: Before calling notify() with a previously captured email, always re-read state from localStorage to check if another taskpane instance has already notified and cleared that email. This prevents double-notify when multiple taskpane instances exist (e.g. Desktop compose opening in a separate window while the read-mode taskpane remains active).
+Rule R1: Explicitly detect compose mode as a distinct state transition. When the add-in detects it is in compose mode (item exists but has no itemId), treat this as an explicit deselection event — re-read state from localStorage, notify the previously captured email if present, and clear it. Do not rely solely on ItemChanged or re-initialization to handle compose transitions.
+Handle compose as a first-class path in both initialize() and ItemChanged handling, separate from the noItem and differentItem cases.
 
-Rule R2: When the add-in initializes, if there is a previously captured email in persisted state, and the current context is either compose mode (no itemId), has no item, or has a different item, treat this as a deselection of the previous email — call notify() with the saved email data and clear it before proceeding with any new item capture.
+Rule R2: Before calling notify() with a previously captured email, always re-read state from localStorage to check if another taskpane instance has already notified and cleared that email. This prevents double-notify when multiple taskpane instances exist (e.g. Desktop compose opening in a separate window while the read-mode taskpane remains active).
+
+Rule R3: When the add-in initializes, if there is a previously captured email in persisted state, and the current context is either compose mode (no itemId), has no item, or has a different item, treat this as a deselection of the previous email — call notify() with the saved email data and clear it before proceeding with any new item capture.
 
 This rule covers all deselection scenarios:
 
