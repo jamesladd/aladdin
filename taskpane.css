@@ -20,15 +20,6 @@ body {
     margin: 0 auto;
 }
 
-#status {
-    font-size: 12px;
-    color: #888;
-    margin-bottom: 15px;
-    padding: 8px 12px;
-    background: #e8e8e8;
-    border-radius: 4px;
-}
-
 .user-info {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
@@ -51,35 +42,21 @@ body {
     margin-top: 4px;
 }
 
+#status {
+    font-size: 13px;
+    color: #888;
+    margin-bottom: 15px;
+    padding: 8px;
+    background: #fff;
+    border-radius: 4px;
+    border-left: 4px solid #667eea;
+}
+
 .section-title {
     font-size: 16px;
     font-weight: 600;
     margin-bottom: 15px;
     color: #555;
-}
-
-.email-detail-card {
-    background: white;
-    padding: 15px;
-    border-radius: 6px;
-    border-left: 4px solid #764ba2;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    margin-bottom: 20px;
-}
-
-.email-field {
-    font-size: 13px;
-    color: #444;
-    padding: 4px 0;
-    border-bottom: 1px solid #f0f0f0;
-}
-
-.email-field:last-child {
-    border-bottom: none;
-}
-
-.email-field strong {
-    color: #333;
 }
 
 .events {
