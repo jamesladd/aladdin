@@ -1,5 +1,5 @@
 You are an expert at creating minimal Outlook Mail Add-ins using the latest Version Overrides 1.1 and vanilla html, css and javascript.
-Your goal is to create an add-in that knows when an email is selected and what the user did with the email.
+Your goal is to create an add-in that knows when an email is selected, store it and when it is no longer selected notify an API.
 
 You MUST use https://jamesladd.github.io/aladdin as the Url for Add-in sources and assets.
 You MUST put CSS in its own file not inline.
@@ -54,6 +54,13 @@ function aladdin(Office) {
     },
     initialize() {
     },
+    notify() {
+    },
+    async getCategories() { // This will be enhanced to make an API call
+      return [
+        { displayName: 'InboxAgent', color: '#f54900' }
+      ]
+    }
   }
 }
 
@@ -111,8 +118,6 @@ You MUST start with the following taskpane.html and modify it to achieve the req
 </html>
 
 You MUST start with the following taskpane.css file and modify it to achieve the reuqested outcomes:
-
-/* taskpane.css */
 
 /* taskpane.css */
 
@@ -233,24 +238,345 @@ body {
     }
 }
 
+You MUST start with the following valid manifest.xml file:
+
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<OfficeApp
+        xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+        xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0"
+        xsi:type="MailApp">
+
+    <!-- Basic Settings -->
+    <Id>8a8e3d85-8f9d-4b1e-9c3d-7a6b5c4dbeef</Id>
+    <Version>1.47.0.0</Version>
+    <ProviderName>Aportio</ProviderName>
+    <DefaultLocale>en-US</DefaultLocale>
+    <DisplayName DefaultValue="InboxAgent A"/>
+    <Description DefaultValue="Tracks email events and displays user activity"/>
+    <IconUrl DefaultValue="https://jamesladd.github.io/aladdin/assets/icon-64.png"/>
+    <HighResolutionIconUrl DefaultValue="https://jamesladd.github.io/aladdin/assets/icon-128.png"/>
+    <SupportUrl DefaultValue="https://jamesladd.github.io/aladdin/support"/>
+
+    <!-- Hosts -->
+    <Hosts>
+        <Host Name="Mailbox"/>
+    </Hosts>
+
+    <Requirements>
+        <Sets>
+            <Set Name="Mailbox" MinVersion="1.8"/>
+        </Sets>
+    </Requirements>
+
+    <!-- Form Settings -->
+    <FormSettings>
+        <Form xsi:type="ItemRead">
+            <DesktopSettings>
+                <SourceLocation DefaultValue="https://jamesladd.github.io/aladdin/taskpane.html"/>
+                <RequestedHeight>450</RequestedHeight>
+            </DesktopSettings>
+        </Form>
+    </FormSettings>
+
+    <!-- Permissions -->
+    <Permissions>ReadWriteMailbox</Permissions>
+
+    <!-- Activation Rule: Always show in taskpane for mail items -->
+    <Rule xsi:type="RuleCollection" Mode="Or">
+        <Rule xsi:type="ItemIs" ItemType="Message" FormType="Read"/>
+        <Rule xsi:type="ItemIs" ItemType="Message" FormType="Edit"/>
+        <Rule xsi:type="ItemIs" ItemType="Appointment" FormType="Read"/>
+        <Rule xsi:type="ItemIs" ItemType="Appointment" FormType="Edit"/>
+    </Rule>
+
+    <DisableEntityHighlighting>false</DisableEntityHighlighting>
+
+    <!-- Version Overrides 1.0 (Root) -->
+    <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides" xsi:type="VersionOverridesV1_0">
+
+        <Requirements>
+            <bt:Sets DefaultMinVersion="1.8">
+                <bt:Set Name="Mailbox"/>
+            </bt:Sets>
+        </Requirements>
+
+        <Hosts>
+            <Host xsi:type="MailHost">
+                <DesktopFormFactor>
+                    <ExtensionPoint xsi:type="MessageReadCommandSurface">
+                        <OfficeTab id="TabDefault">
+                            <Group id="msgReadGroup">
+                                <Label resid="GroupLabel"/>
+                                <Control xsi:type="Button" id="msgReadOpenPaneButton">
+                                    <Label resid="TaskpaneButton.Label"/>
+                                    <Supertip>
+                                        <Title resid="TaskpaneButton.Label"/>
+                                        <Description resid="TaskpaneButton.Tooltip"/>
+                                    </Supertip>
+                                    <Icon>
+                                        <bt:Image size="16" resid="Icon.16x16"/>
+                                        <bt:Image size="32" resid="Icon.32x32"/>
+                                        <bt:Image size="80" resid="Icon.80x80"/>
+                                    </Icon>
+                                    <Action xsi:type="ShowTaskpane">
+                                        <SourceLocation resid="Taskpane.Url"/>
+                                    </Action>
+                                </Control>
+                            </Group>
+                        </OfficeTab>
+                    </ExtensionPoint>
+
+                    <ExtensionPoint xsi:type="MessageComposeCommandSurface">
+                        <OfficeTab id="TabDefault">
+                            <Group id="msgComposeGroup">
+                                <Label resid="GroupLabel"/>
+                                <Control xsi:type="Button" id="msgComposeOpenPaneButton">
+                                    <Label resid="TaskpaneButton.Label"/>
+                                    <Supertip>
+                                        <Title resid="TaskpaneButton.Label"/>
+                                        <Description resid="TaskpaneButton.Tooltip"/>
+                                    </Supertip>
+                                    <Icon>
+                                        <bt:Image size="16" resid="Icon.16x16"/>
+                                        <bt:Image size="32" resid="Icon.32x32"/>
+                                        <bt:Image size="80" resid="Icon.80x80"/>
+                                    </Icon>
+                                    <Action xsi:type="ShowTaskpane">
+                                        <SourceLocation resid="Taskpane.Url"/>
+                                    </Action>
+                                </Control>
+                            </Group>
+                        </OfficeTab>
+                    </ExtensionPoint>
+
+                    <ExtensionPoint xsi:type="AppointmentOrganizerCommandSurface">
+                        <OfficeTab id="TabDefault">
+                            <Group id="apptOrganizerGroup">
+                                <Label resid="GroupLabel"/>
+                                <Control xsi:type="Button" id="apptOrganizerOpenPaneButton">
+                                    <Label resid="TaskpaneButton.Label"/>
+                                    <Supertip>
+                                        <Title resid="TaskpaneButton.Label"/>
+                                        <Description resid="TaskpaneButton.Tooltip"/>
+                                    </Supertip>
+                                    <Icon>
+                                        <bt:Image size="16" resid="Icon.16x16"/>
+                                        <bt:Image size="32" resid="Icon.32x32"/>
+                                        <bt:Image size="80" resid="Icon.80x80"/>
+                                    </Icon>
+                                    <Action xsi:type="ShowTaskpane">
+                                        <SourceLocation resid="Taskpane.Url"/>
+                                    </Action>
+                                </Control>
+                            </Group>
+                        </OfficeTab>
+                    </ExtensionPoint>
+
+                    <ExtensionPoint xsi:type="AppointmentAttendeeCommandSurface">
+                        <OfficeTab id="TabDefault">
+                            <Group id="apptAttendeeGroup">
+                                <Label resid="GroupLabel"/>
+                                <Control xsi:type="Button" id="apptAttendeeOpenPaneButton">
+                                    <Label resid="TaskpaneButton.Label"/>
+                                    <Supertip>
+                                        <Title resid="TaskpaneButton.Label"/>
+                                        <Description resid="TaskpaneButton.Tooltip"/>
+                                    </Supertip>
+                                    <Icon>
+                                        <bt:Image size="16" resid="Icon.16x16"/>
+                                        <bt:Image size="32" resid="Icon.32x32"/>
+                                        <bt:Image size="80" resid="Icon.80x80"/>
+                                    </Icon>
+                                    <Action xsi:type="ShowTaskpane">
+                                        <SourceLocation resid="Taskpane.Url"/>
+                                    </Action>
+                                </Control>
+                            </Group>
+                        </OfficeTab>
+                    </ExtensionPoint>
+                </DesktopFormFactor>
+            </Host>
+        </Hosts>
+
+        <Resources>
+            <bt:Images>
+                <bt:Image id="Icon.16x16" DefaultValue="https://jamesladd.github.io/aladdin/assets/icon-16.png"/>
+                <bt:Image id="Icon.32x32" DefaultValue="https://jamesladd.github.io/aladdin/assets/icon-32.png"/>
+                <bt:Image id="Icon.80x80" DefaultValue="https://jamesladd.github.io/aladdin/assets/icon-80.png"/>
+            </bt:Images>
+            <bt:Urls>
+                <bt:Url id="Taskpane.Url" DefaultValue="https://jamesladd.github.io/aladdin/taskpane.html"/>
+            </bt:Urls>
+            <bt:ShortStrings>
+                <bt:String id="GroupLabel" DefaultValue="Aladdin"/>
+                <bt:String id="TaskpaneButton.Label" DefaultValue="Show Aladdin"/>
+            </bt:ShortStrings>
+            <bt:LongStrings>
+                <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Open the Aladdin taskpane to view email events"/>
+            </bt:LongStrings>
+        </Resources>
+
+        <!-- Nested VersionOverrides 1.1 for SupportsPinning -->
+        <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides/1.1" xsi:type="VersionOverridesV1_1">
+
+            <Requirements>
+                <bt:Sets DefaultMinVersion="1.8">
+                    <bt:Set Name="Mailbox"/>
+                </bt:Sets>
+            </Requirements>
+
+            <Hosts>
+                <Host xsi:type="MailHost">
+                    <DesktopFormFactor>
+                        <ExtensionPoint xsi:type="MessageReadCommandSurface">
+                            <OfficeTab id="TabDefault">
+                                <Group id="msgReadGroup">
+                                    <Label resid="GroupLabel"/>
+                                    <Control xsi:type="Button" id="msgReadOpenPaneButton">
+                                        <Label resid="TaskpaneButton.Label"/>
+                                        <Supertip>
+                                            <Title resid="TaskpaneButton.Label"/>
+                                            <Description resid="TaskpaneButton.Tooltip"/>
+                                        </Supertip>
+                                        <Icon>
+                                            <bt:Image size="16" resid="Icon.16x16"/>
+                                            <bt:Image size="32" resid="Icon.32x32"/>
+                                            <bt:Image size="80" resid="Icon.80x80"/>
+                                        </Icon>
+                                        <Action xsi:type="ShowTaskpane">
+                                            <SourceLocation resid="Taskpane.Url"/>
+                                            <SupportsPinning>true</SupportsPinning>
+                                        </Action>
+                                    </Control>
+                                </Group>
+                            </OfficeTab>
+                        </ExtensionPoint>
+
+                        <ExtensionPoint xsi:type="MessageComposeCommandSurface">
+                            <OfficeTab id="TabDefault">
+                                <Group id="msgComposeGroup">
+                                    <Label resid="GroupLabel"/>
+                                    <Control xsi:type="Button" id="msgComposeOpenPaneButton">
+                                        <Label resid="TaskpaneButton.Label"/>
+                                        <Supertip>
+                                            <Title resid="TaskpaneButton.Label"/>
+                                            <Description resid="TaskpaneButton.Tooltip"/>
+                                        </Supertip>
+                                        <Icon>
+                                            <bt:Image size="16" resid="Icon.16x16"/>
+                                            <bt:Image size="32" resid="Icon.32x32"/>
+                                            <bt:Image size="80" resid="Icon.80x80"/>
+                                        </Icon>
+                                        <Action xsi:type="ShowTaskpane">
+                                            <SourceLocation resid="Taskpane.Url"/>
+                                            <SupportsPinning>true</SupportsPinning>
+                                        </Action>
+                                    </Control>
+                                </Group>
+                            </OfficeTab>
+                        </ExtensionPoint>
+
+                        <ExtensionPoint xsi:type="AppointmentOrganizerCommandSurface">
+                            <OfficeTab id="TabDefault">
+                                <Group id="apptOrganizerGroup">
+                                    <Label resid="GroupLabel"/>
+                                    <Control xsi:type="Button" id="apptOrganizerOpenPaneButton">
+                                        <Label resid="TaskpaneButton.Label"/>
+                                        <Supertip>
+                                            <Title resid="TaskpaneButton.Label"/>
+                                            <Description resid="TaskpaneButton.Tooltip"/>
+                                        </Supertip>
+                                        <Icon>
+                                            <bt:Image size="16" resid="Icon.16x16"/>
+                                            <bt:Image size="32" resid="Icon.32x32"/>
+                                            <bt:Image size="80" resid="Icon.80x80"/>
+                                        </Icon>
+                                        <Action xsi:type="ShowTaskpane">
+                                            <SourceLocation resid="Taskpane.Url"/>
+                                        </Action>
+                                    </Control>
+                                </Group>
+                            </OfficeTab>
+                        </ExtensionPoint>
+
+                        <ExtensionPoint xsi:type="AppointmentAttendeeCommandSurface">
+                            <OfficeTab id="TabDefault">
+                                <Group id="apptAttendeeGroup">
+                                    <Label resid="GroupLabel"/>
+                                    <Control xsi:type="Button" id="apptAttendeeOpenPaneButton">
+                                        <Label resid="TaskpaneButton.Label"/>
+                                        <Supertip>
+                                            <Title resid="TaskpaneButton.Label"/>
+                                            <Description resid="TaskpaneButton.Tooltip"/>
+                                        </Supertip>
+                                        <Icon>
+                                            <bt:Image size="16" resid="Icon.16x16"/>
+                                            <bt:Image size="32" resid="Icon.32x32"/>
+                                            <bt:Image size="80" resid="Icon.80x80"/>
+                                        </Icon>
+                                        <Action xsi:type="ShowTaskpane">
+                                            <SourceLocation resid="Taskpane.Url"/>
+                                        </Action>
+                                    </Control>
+                                </Group>
+                            </OfficeTab>
+                        </ExtensionPoint>
+                    </DesktopFormFactor>
+                </Host>
+            </Hosts>
+
+            <Resources>
+                <bt:Images>
+                    <bt:Image id="Icon.16x16" DefaultValue="https://jamesladd.github.io/aladdin/assets/icon-16.png"/>
+                    <bt:Image id="Icon.32x32" DefaultValue="https://jamesladd.github.io/aladdin/assets/icon-32.png"/>
+                    <bt:Image id="Icon.80x80" DefaultValue="https://jamesladd.github.io/aladdin/assets/icon-80.png"/>
+                </bt:Images>
+                <bt:Urls>
+                    <bt:Url id="Taskpane.Url" DefaultValue="https://jamesladd.github.io/aladdin/taskpane.html"/>
+                </bt:Urls>
+                <bt:ShortStrings>
+                    <bt:String id="GroupLabel" DefaultValue="Aladdin"/>
+                    <bt:String id="TaskpaneButton.Label" DefaultValue="Show Aladdin"/>
+                </bt:ShortStrings>
+                <bt:LongStrings>
+                    <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Open the Aladdin taskpane to view email events"/>
+                </bt:LongStrings>
+            </Resources>
+
+        </VersionOverrides>
+
+    </VersionOverrides>
+
+</OfficeApp>
+
 
 Update the files to enable the addin to do the following:
 
 1. Listen to all events that can be listened to by a Web and Desktop enabled add-in, and call event() passing the name and details of the event.
-2. Keep the last 10 events passed to event() in order of most recent to least recent.
-3. Show the list set of events received in the Taskpane.
-4. Record received events in the addin state
-5. Save the addin state after it has changed
-6. Watch for changes in the stored addin state and load them when they have changed.
-7. Get the name of the current user and show it as the first entry in the Taskpane.
-8. Get the Office context platform and show that after the name of the current user.
-9. Get the Office version and show that after the platform.
-10. Capture the selected email item fields: headers, categories, flags, To, From, CC, Subject and attachment information.
-11. Capture the raw email headers with Office context mailbox item getAllInternetHeadersAsync, and convert the string into key/value pairs.
-12. Do not create a poll for changes for e.g. setInterval. Assume the regular raising of events keep things in sync.
-13. Check for getAsync before using async methods to get item fields: To, From, Subject, CC, categories and flags; and use async if available.
-14. You MUST register event handlers at the correct API level: use Office.context.mailbox.addHandlerAsync() for mailbox-level events (ItemChanged, OfficeThemeChanged) and use Office.context.mailbox.item.addHandlerAsync() for item-level events (RecipientsChanged, AttachmentsChanged, RecurrenceChanged, AppointmentTimeChanged, EnhancedLocationsChanged), and you MUST check that Office.context.mailbox.item exists before attempting to register item-level event handlers.
-15. Your MUST only register events that are actually supported by the Outlook Javascript API.
-16. When an email item is selected its item id should be kept it as the _currentItemId in the instance not the state.
-17. Before the _currentItemId is changed the item in the state with the _currentItemId must be logged to the console with JSON.stringify.
-18. When the add-in is initialized a new category with the displayName "InboxAgent" and the color #f54900 must be added to the list of masterCategories.
+2. Get the name of the current user and show it as the first entry in the Taskpane.
+3. Get the name of the current inbox or folder and show that after the current user. Use the internet headers to try to extract folder information when available.
+4. Get the Office context platform and show that after the current inbox.
+5. Get the Office version and show that after the platform.
+6. On initialization of the addin, call the intialize function passing in the name of the current user, name of the current inbox / folder,
+   the office platform and version.
+7. When an email is selected capture the following email item information:
+   a. To
+   b. From
+   c. CC
+   d. Subject
+   e. Attachment information (the names of attachments)
+   f. Raw email headers with Office context mailbox item getAllInternetHeadersAsync, and convert the string into key/value pairs.
+8. When a different email is selected or no email is selected the current captured email information is to be sent to an API
+   by calling the notify function.
+9. When the current email detail has been sent with the notify function the current email details in the state can be deleted.
+10. To ensure that the current email details are available across different activations of the addin the email details should
+    be stored in state and persisted in localstorage.
+11. LocalStorage should be watched so any activation of the addin can see what the current selected email details are.
+12. When the add-in is initialized call getCategories to get a list of categories that must be added to the list of masterCategories.
+13. Do not create a poll for changes for e.g. setInterval. Assume the regular raising of events keep things in sync.
+14. Check for getAsync before using async methods to get item fields: To, From, Subject, CC, categories and flags; and use async if available.
+15. You MUST register event handlers at the correct API level: use Office.context.mailbox.addHandlerAsync() for mailbox-level events (ItemChanged, OfficeThemeChanged) and use Office.context.mailbox.item.addHandlerAsync() for item-level events (RecipientsChanged, AttachmentsChanged, RecurrenceChanged, AppointmentTimeChanged, EnhancedLocationsChanged), and you MUST check that Office.context.mailbox.item exists before attempting to register item-level event handlers.
+16. Your MUST only register events that are actually supported by the Outlook Javascript API.
+

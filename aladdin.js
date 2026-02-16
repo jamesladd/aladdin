@@ -1,13 +1,14 @@
 // aladdin.js
 
+const STORAGE_KEY = 'aladdin_state'
 const singleton = [false]
 
 export function createAladdin(Office) {
-  if (typeof window !== 'undefined' && window.aladdinInstance) return window.aladdinInstance;
-  if (singleton[0]) return singleton[0];
+  if (typeof window !== 'undefined' && window.aladdinInstance) return window.aladdinInstance
+  if (singleton[0]) return singleton[0]
   const instance = aladdin(Office)
-  if (typeof window !== 'undefined') window.aladdinInstance = instance;
-  if (typeof window === 'undefined') singleton[0] = instance;
+  if (typeof window !== 'undefined') window.aladdinInstance = instance
+  if (typeof window === 'undefined') singleton[0] = instance
   instance.loadState()
   instance.watchState()
   return instance
@@ -19,12 +20,11 @@ function aladdin(Office) {
     _currentItemId: null,
     _state: {
       events: [],
-      items: {},
-      userInfo: {
-        name: '',
-        platform: '',
-        version: ''
-      }
+      currentEmail: null,
+      userName: null,
+      folderName: null,
+      platform: null,
+      version: null
     },
 
     state() {
@@ -33,36 +33,51 @@ function aladdin(Office) {
 
     saveState() {
       try {
-        const stateJson = JSON.stringify(this._state)
-        localStorage.setItem('aladdin-state', stateJson)
-        console.log('State saved:', this._state)
-      } catch (error) {
-        console.error('Error saving state:', error)
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(this._state))
+        }
+      } catch (e) {
+        console.error('Failed to save state', e)
       }
     },
 
     loadState() {
       try {
-        const stateJson = localStorage.getItem('aladdin-state')
-        if (stateJson) {
-          this._state = JSON.parse(stateJson)
-          console.log('State loaded:', this._state)
+        if (typeof localStorage !== 'undefined') {
+          const stored = localStorage.getItem(STORAGE_KEY)
+          if (stored) {
+            const parsed = JSON.parse(stored)
+            this._state.events = parsed.events || []
+            this._state.currentEmail = parsed.currentEmail || null
+            this._state.userName = parsed.userName || null
+            this._state.folderName = parsed.folderName || null
+            this._state.platform = parsed.platform || null
+            this._state.version = parsed.version || null
+            if (this._state.currentEmail && this._state.currentEmail.itemId) {
+              this._currentItemId = this._state.currentEmail.itemId
+            }
+          }
         }
-      } catch (error) {
-        console.error('Error loading state:', error)
+      } catch (e) {
+        console.error('Failed to load state', e)
       }
     },
 
     watchState() {
       if (typeof window !== 'undefined') {
         window.addEventListener('storage', (e) => {
-          if (e.key === 'aladdin-state' && e.newValue) {
+          if (e.key === STORAGE_KEY && e.newValue) {
             try {
-              this._state = JSON.parse(e.newValue)
-              console.log('State updated from storage:', this._state)
-              this.updateUI()
-            } catch (error) {
-              console.error('Error parsing storage event:', error)
+              const parsed = JSON.parse(e.newValue)
+              this._state.events = parsed.events || []
+              this._state.currentEmail = parsed.currentEmail || null
+              this._state.userName = parsed.userName || this._state.userName
+              this._state.folderName = parsed.folderName || this._state.folderName
+              this._state.platform = parsed.platform || this._state.platform
+              this._state.version = parsed.version || this._state.version
+              this.renderUI()
+            } catch (err) {
+              console.error('Failed to parse storage event', err)
             }
           }
         })
@@ -70,407 +85,465 @@ function aladdin(Office) {
     },
 
     event(name, details) {
-      const event = {
+      const entry = {
         name,
-        details,
+        details: details || {},
         timestamp: new Date().toISOString()
       }
-
-      // Add to beginning of events array
-      this._state.events.unshift(event)
-
-      // Keep only last 10 events
-      if (this._state.events.length > 10) {
-        this._state.events = this._state.events.slice(0, 10)
+      this._state.events.unshift(entry)
+      if (this._state.events.length > 50) {
+        this._state.events = this._state.events.slice(0, 50)
       }
-
-      console.log('Event recorded:', event)
       this.saveState()
-      this.updateUI()
+      this.renderUI()
     },
 
-    updateUI() {
-      this.renderUserInfo()
-      this.renderEvents()
+    async initialize(userName, folderName, platform, version) {
+      this._state.userName = userName
+      this._state.folderName = folderName
+      this._state.platform = platform
+      this._state.version = version
+      this.saveState()
+
+      this.event('initialized', { userName, folderName, platform, version })
+
+      this._registerMailboxEvents()
+
+      await this._addMasterCategories()
+
+      await this._captureCurrentItem()
+
+      this.renderUI()
     },
 
-    renderUserInfo() {
-      const userInfoEl = document.getElementById('user-info')
-      if (!userInfoEl) return
-
-      const { name, platform, version } = this._state.userInfo
-      userInfoEl.innerHTML = `
-        <div class="user-name">${name || 'Loading...'}</div>
-        <div class="platform">Platform: ${platform || 'Unknown'}</div>
-        <div class="platform">Version: ${version || 'Unknown'}</div>
-      `
-    },
-
-    renderEvents() {
-      const eventsEl = document.getElementById('events')
-      if (!eventsEl) return
-
-      if (this._state.events.length === 0) {
-        eventsEl.innerHTML = '<div class="no-events">No events recorded yet</div>'
-        return
-      }
-
-      eventsEl.innerHTML = this._state.events.map(event => `
-        <div class="event-item">
-          <div class="event-name">${this.escapeHtml(event.name)}</div>
-          <div class="event-timestamp">${new Date(event.timestamp).toLocaleString()}</div>
-          <div class="event-details">${this.escapeHtml(JSON.stringify(event.details, null, 2))}</div>
-        </div>
-      `).join('')
-    },
-
-    escapeHtml(text) {
-      const div = document.createElement('div')
-      div.textContent = text
-      return div.innerHTML
-    },
-
-    async getUserInfo() {
-      try {
-        const userProfile = this.Office.context.mailbox.userProfile
-        this._state.userInfo.name = userProfile.displayName || userProfile.emailAddress || 'Unknown User'
-
-        const platform = this.Office.context.platform || this.Office.context.host || 'Unknown'
-        this._state.userInfo.platform = this.getPlatformName(platform)
-
-        const diagnostics = this.Office.context.diagnostics
-        this._state.userInfo.version = diagnostics ? diagnostics.version : 'Unknown'
-
-        this.saveState()
-        this.updateUI()
-
-        this.event('UserInfoLoaded', {
-          name: this._state.userInfo.name,
-          platform: this._state.userInfo.platform,
-          version: this._state.userInfo.version
-        })
-      } catch (error) {
-        console.error('Error getting user info:', error)
-        this.event('UserInfoError', { error: error.message })
-      }
-    },
-
-    getPlatformName(platform) {
-      const platformMap = {
-        0: 'PC',
-        1: 'OfficeOnline',
-        2: 'Mac',
-        3: 'iOS',
-        4: 'Android',
-        5: 'Universal'
-      }
-      return platformMap[platform] || String(platform)
-    },
-
-    parseInternetHeaders(headersString) {
-      const headers = {}
-      if (!headersString) return headers
-
-      const lines = headersString.split('\r\n')
-      let currentKey = null
-      let currentValue = ''
-
-      for (const line of lines) {
-        if (line.match(/^\s/) && currentKey) {
-          // Continuation of previous header
-          currentValue += ' ' + line.trim()
-        } else {
-          // Save previous header
-          if (currentKey) {
-            headers[currentKey] = currentValue.trim()
-          }
-
-          // Parse new header
-          const colonIndex = line.indexOf(':')
-          if (colonIndex > 0) {
-            currentKey = line.substring(0, colonIndex).trim()
-            currentValue = line.substring(colonIndex + 1).trim()
-          } else {
-            currentKey = null
-            currentValue = ''
-          }
-        }
-      }
-
-      // Save last header
-      if (currentKey) {
-        headers[currentKey] = currentValue.trim()
-      }
-
-      return headers
-    },
-
-    async captureItemFields(item) {
-      if (!item) return null
-
-      const itemData = {
-        itemId: item.itemId,
-        conversationId: item.conversationId,
-        subject: null,
-        from: null,
-        to: null,
-        cc: null,
-        categories: null,
-        flags: null,
-        attachments: [],
-        internetHeaders: {}
-      }
-
-      try {
-        // Check if getAsync is available for each field
-        if (item.subject && typeof item.subject.getAsync === 'function') {
-          itemData.subject = await this.getAsync(item.subject)
-        } else {
-          itemData.subject = item.subject
-        }
-
-        if (item.from && typeof item.from.getAsync === 'function') {
-          itemData.from = await this.getAsync(item.from)
-        } else {
-          itemData.from = item.from
-        }
-
-        if (item.to && typeof item.to.getAsync === 'function') {
-          itemData.to = await this.getAsync(item.to)
-        } else {
-          itemData.to = item.to
-        }
-
-        if (item.cc && typeof item.cc.getAsync === 'function') {
-          itemData.cc = await this.getAsync(item.cc)
-        } else {
-          itemData.cc = item.cc
-        }
-
-        if (item.categories && typeof item.categories.getAsync === 'function') {
-          itemData.categories = await this.getAsync(item.categories)
-        } else {
-          itemData.categories = item.categories
-        }
-
-        // Get attachments
-        if (item.attachments) {
-          itemData.attachments = item.attachments.map(att => ({
-            id: att.id,
-            name: att.name,
-            size: att.size,
-            attachmentType: att.attachmentType,
-            isInline: att.isInline,
-            contentType: att.contentType
-          }))
-        }
-
-        // Get internet headers
-        if (item.getAllInternetHeadersAsync) {
-          const headersString = await this.getAllInternetHeadersAsync(item)
-          itemData.internetHeaders = this.parseInternetHeaders(headersString)
-        }
-
-      } catch (error) {
-        console.error('Error capturing item fields:', error)
-        this.event('ItemFieldsError', { error: error.message })
-      }
-
-      return itemData
-    },
-
-    getAsync(property) {
-      return new Promise((resolve, reject) => {
-        property.getAsync((asyncResult) => {
-          if (asyncResult.status === this.Office.AsyncResultStatus.Succeeded) {
-            resolve(asyncResult.value)
-          } else {
-            reject(new Error(asyncResult.error.message))
-          }
-        })
-      })
-    },
-
-    getAllInternetHeadersAsync(item) {
-      return new Promise((resolve, reject) => {
-        item.getAllInternetHeadersAsync((asyncResult) => {
-          if (asyncResult.status === this.Office.AsyncResultStatus.Succeeded) {
-            resolve(asyncResult.value)
-          } else {
-            reject(new Error(asyncResult.error.message))
-          }
-        })
-      })
-    },
-
-    async handleItemChanged(eventArgs) {
-      this.event('ItemChanged', { eventType: eventArgs.type })
-
-      const item = this.Office.context.mailbox.item
-      if (!item) {
-        this._currentItemId = null
-        return
-      }
-
-      const newItemId = item.itemId
-
-      // Log previous item before changing
-      if (this._currentItemId && this._currentItemId !== newItemId) {
-        const previousItem = this._state.items[this._currentItemId]
-        if (previousItem) {
-          console.log('Previous item before change:', JSON.stringify(previousItem))
-        }
-      }
-
-      // Update current item ID
-      this._currentItemId = newItemId
-
-      // Capture new item fields
-      const itemData = await this.captureItemFields(item)
-      if (itemData) {
-        this._state.items[newItemId] = itemData
-        this.saveState()
-        this.event('ItemCaptured', { itemId: newItemId })
-      }
-    },
-
-    registerMailboxEvents() {
+    _registerMailboxEvents() {
       const mailbox = this.Office.context.mailbox
 
       // Mailbox-level events
-      mailbox.addHandlerAsync(
-        this.Office.EventType.ItemChanged,
-        this.handleItemChanged.bind(this),
-        (asyncResult) => {
-          if (asyncResult.status === this.Office.AsyncResultStatus.Succeeded) {
-            console.log('ItemChanged handler registered')
-            this.event('HandlerRegistered', { eventType: 'ItemChanged' })
-          } else {
-            console.error('Failed to register ItemChanged handler:', asyncResult.error)
+      const mailboxEvents = ['ItemChanged']
+      mailboxEvents.forEach((eventName) => {
+        if (this.Office.EventType[eventName]) {
+          try {
+            mailbox.addHandlerAsync(
+              this.Office.EventType[eventName],
+              (eventArgs) => this._handleMailboxEvent(eventName, eventArgs),
+              (result) => {
+                if (result.status === this.Office.AsyncResultStatus.Succeeded) {
+                  console.log('Registered mailbox event: ' + eventName)
+                } else {
+                  console.warn('Failed to register mailbox event: ' + eventName, result.error)
+                }
+              }
+            )
+          } catch (e) {
+            console.warn('Error registering mailbox event: ' + eventName, e)
           }
         }
-      )
+      })
 
-      mailbox.addHandlerAsync(
-        this.Office.EventType.OfficeThemeChanged,
-        (eventArgs) => {
-          this.event('OfficeThemeChanged', { eventType: eventArgs.type })
-        },
-        (asyncResult) => {
-          if (asyncResult.status === this.Office.AsyncResultStatus.Succeeded) {
-            console.log('OfficeThemeChanged handler registered')
-            this.event('HandlerRegistered', { eventType: 'OfficeThemeChanged' })
-          }
-        }
-      )
+      // Item-level events - only if item exists
+      this._registerItemEvents()
     },
 
-    registerItemEvents() {
+    _registerItemEvents() {
       const item = this.Office.context.mailbox.item
-      if (!item) {
-        console.log('No item available for event registration')
-        return
-      }
+      if (!item) return
 
-      // Item-level events
       const itemEvents = [
-        { type: this.Office.EventType.RecipientsChanged, name: 'RecipientsChanged' },
-        { type: this.Office.EventType.AttachmentsChanged, name: 'AttachmentsChanged' },
-        { type: this.Office.EventType.RecurrenceChanged, name: 'RecurrenceChanged' },
-        { type: this.Office.EventType.AppointmentTimeChanged, name: 'AppointmentTimeChanged' },
-        { type: this.Office.EventType.EnhancedLocationsChanged, name: 'EnhancedLocationsChanged' }
+        'RecipientsChanged',
+        'AttachmentsChanged',
+        'RecurrenceChanged',
+        'AppointmentTimeChanged',
+        'EnhancedLocationsChanged'
       ]
 
-      itemEvents.forEach(({ type, name }) => {
-        if (type) {
-          item.addHandlerAsync(
-            type,
-            (eventArgs) => {
-              this.event(name, { eventType: eventArgs.type })
-            },
-            (asyncResult) => {
-              if (asyncResult.status === this.Office.AsyncResultStatus.Succeeded) {
-                console.log(`${name} handler registered`)
-                this.event('HandlerRegistered', { eventType: name })
+      itemEvents.forEach((eventName) => {
+        if (this.Office.EventType[eventName]) {
+          try {
+            item.addHandlerAsync(
+              this.Office.EventType[eventName],
+              (eventArgs) => this._handleItemEvent(eventName, eventArgs),
+              (result) => {
+                if (result.status === this.Office.AsyncResultStatus.Succeeded) {
+                  console.log('Registered item event: ' + eventName)
+                } else {
+                  console.warn('Failed to register item event: ' + eventName, result.error)
+                }
               }
-            }
-          )
+            )
+          } catch (e) {
+            console.warn('Error registering item event: ' + eventName, e)
+          }
         }
       })
     },
 
-    async addInboxAgentCategory() {
-      try {
-        const mailbox = this.Office.context.mailbox
-        if (!mailbox.masterCategories) {
-          console.log('Master categories not supported')
-          return
-        }
+    _handleMailboxEvent(eventName, eventArgs) {
+      this.event(eventName, { type: 'mailbox', args: eventArgs || {} })
 
-        const categories = await new Promise((resolve, reject) => {
-          mailbox.masterCategories.getAsync((asyncResult) => {
-            if (asyncResult.status === this.Office.AsyncResultStatus.Succeeded) {
-              resolve(asyncResult.value)
-            } else {
-              reject(new Error(asyncResult.error.message))
-            }
-          })
-        })
-
-        // Check if InboxAgent category already exists
-        const existingCategory = categories.find(cat => cat.displayName === 'InboxAgent')
-        if (existingCategory) {
-          console.log('InboxAgent category already exists')
-          this.event('CategoryExists', { displayName: 'InboxAgent' })
-          return
-        }
-
-        // Add new category
-        await new Promise((resolve, reject) => {
-          mailbox.masterCategories.addAsync(
-            [{ displayName: 'InboxAgent', color: this.Office.MailboxEnums.CategoryColor.Preset9 }],
-            (asyncResult) => {
-              if (asyncResult.status === this.Office.AsyncResultStatus.Succeeded) {
-                resolve()
-              } else {
-                reject(new Error(asyncResult.error.message))
-              }
-            }
-          )
-        })
-
-        console.log('InboxAgent category added')
-        this.event('CategoryAdded', { displayName: 'InboxAgent', color: '#f54900' })
-
-      } catch (error) {
-        console.error('Error adding InboxAgent category:', error)
-        this.event('CategoryAddError', { error: error.message })
+      if (eventName === 'ItemChanged') {
+        this._onItemChanged()
       }
     },
 
-    async initialize() {
-      console.log('Initializing Aladdin add-in')
-      this.event('Initialize', { timestamp: new Date().toISOString() })
+    _handleItemEvent(eventName, eventArgs) {
+      this.event(eventName, { type: 'item', args: eventArgs || {} })
+    },
 
-      // Get user info
-      await this.getUserInfo()
-
-      // Register mailbox-level events
-      this.registerMailboxEvents()
-
-      // Register item-level events if item exists
-      if (this.Office.context.mailbox.item) {
-        this.registerItemEvents()
-
-        // Capture current item
-        await this.handleItemChanged({ type: 'Initial' })
+    async _onItemChanged() {
+      // Notify API about the previously selected email before capturing new one
+      if (this._state.currentEmail) {
+        await this.notify()
       }
 
-      // Add InboxAgent category
-      await this.addInboxAgentCategory()
+      // Re-register item-level events for the new item
+      this._registerItemEvents()
 
-      this.updateUI()
-      console.log('Aladdin add-in initialized')
+      // Capture the newly selected item
+      await this._captureCurrentItem()
+
+      // Try to update folder info from the new item's headers
+      await this._updateFolderFromHeaders()
+
+      this.renderUI()
+    },
+
+    async _captureCurrentItem() {
+      const item = this.Office.context.mailbox.item
+      if (!item) {
+        this._currentItemId = null
+        this._state.currentEmail = null
+        this.saveState()
+        return
+      }
+
+      const itemId = item.itemId || null
+
+      // If same item, don't re-capture
+      if (itemId && itemId === this._currentItemId) return
+
+      this._currentItemId = itemId
+
+      const emailData = {
+        itemId: itemId,
+        capturedAt: new Date().toISOString()
+      }
+
+      // Capture To
+      emailData.to = await this._getRecipients(item, 'to')
+      // Capture From
+      emailData.from = await this._getFrom(item)
+      // Capture CC
+      emailData.cc = await this._getRecipients(item, 'cc')
+      // Capture Subject
+      emailData.subject = await this._getSubject(item)
+      // Capture Attachments
+      emailData.attachments = this._getAttachmentNames(item)
+      // Capture Internet Headers
+      emailData.headers = await this._getInternetHeaders(item)
+
+      this._state.currentEmail = emailData
+      this.saveState()
+      this.event('email-captured', { subject: emailData.subject, itemId: emailData.itemId })
+    },
+
+    _getRecipients(item, field) {
+      return new Promise((resolve) => {
+        const prop = item[field]
+        if (!prop) {
+          resolve([])
+          return
+        }
+        if (typeof prop.getAsync === 'function') {
+          prop.getAsync((result) => {
+            if (result.status === this.Office.AsyncResultStatus.Succeeded) {
+              resolve(this._formatRecipients(result.value))
+            } else {
+              resolve([])
+            }
+          })
+        } else if (Array.isArray(prop)) {
+          resolve(this._formatRecipients(prop))
+        } else {
+          resolve([])
+        }
+      })
+    },
+
+    _formatRecipients(recipients) {
+      if (!recipients || !Array.isArray(recipients)) return []
+      return recipients.map((r) => {
+        if (typeof r === 'string') return r
+        return r.displayName ? r.displayName + ' <' + r.emailAddress + '>' : r.emailAddress || ''
+      })
+    },
+
+    _getFrom(item) {
+      return new Promise((resolve) => {
+        const from = item.from
+        if (!from) {
+          resolve(null)
+          return
+        }
+        if (typeof from.getAsync === 'function') {
+          from.getAsync((result) => {
+            if (result.status === this.Office.AsyncResultStatus.Succeeded) {
+              const val = result.value
+              resolve(val.displayName ? val.displayName + ' <' + val.emailAddress + '>' : val.emailAddress || '')
+            } else {
+              resolve(null)
+            }
+          })
+        } else if (typeof from === 'object' && from.emailAddress) {
+          resolve(from.displayName ? from.displayName + ' <' + from.emailAddress + '>' : from.emailAddress)
+        } else if (typeof from === 'string') {
+          resolve(from)
+        } else {
+          resolve(null)
+        }
+      })
+    },
+
+    _getSubject(item) {
+      return new Promise((resolve) => {
+        const subject = item.subject
+        if (subject === undefined || subject === null) {
+          resolve('')
+          return
+        }
+        if (typeof subject === 'object' && typeof subject.getAsync === 'function') {
+          subject.getAsync((result) => {
+            if (result.status === this.Office.AsyncResultStatus.Succeeded) {
+              resolve(result.value || '')
+            } else {
+              resolve('')
+            }
+          })
+        } else {
+          resolve(String(subject))
+        }
+      })
+    },
+
+    _getAttachmentNames(item) {
+      if (!item.attachments) return []
+      return item.attachments.map((a) => a.name || 'Unnamed attachment')
+    },
+
+    _getInternetHeaders(item) {
+      return new Promise((resolve) => {
+        if (typeof item.getAllInternetHeadersAsync === 'function') {
+          item.getAllInternetHeadersAsync((result) => {
+            if (result.status === this.Office.AsyncResultStatus.Succeeded) {
+              resolve(this._parseInternetHeaders(result.value))
+            } else {
+              resolve({})
+            }
+          })
+        } else {
+          resolve({})
+        }
+      })
+    },
+
+    _parseInternetHeaders(headerString) {
+      const headers = {}
+      if (!headerString || typeof headerString !== 'string') return headers
+
+      // Unfold continuation lines (lines starting with whitespace are continuations)
+      const unfolded = headerString.replace(/\r?\n[ \t]+/g, ' ')
+      const lines = unfolded.split(/\r?\n/)
+
+      lines.forEach((line) => {
+        const colonIndex = line.indexOf(':')
+        if (colonIndex > 0) {
+          const key = line.substring(0, colonIndex).trim()
+          const value = line.substring(colonIndex + 1).trim()
+          if (key) {
+            if (headers[key]) {
+              if (Array.isArray(headers[key])) {
+                headers[key].push(value)
+              } else {
+                headers[key] = [headers[key], value]
+              }
+            } else {
+              headers[key] = value
+            }
+          }
+        }
+      })
+      return headers
+    },
+
+    async _updateFolderFromHeaders() {
+      const email = this._state.currentEmail
+      if (!email || !email.headers) return
+
+      const headers = email.headers
+      let folderName = null
+
+      // Try known headers that might contain folder information
+      if (headers['X-Folder']) {
+        folderName = Array.isArray(headers['X-Folder']) ? headers['X-Folder'][0] : headers['X-Folder']
+      } else if (headers['X-Mailbox']) {
+        folderName = Array.isArray(headers['X-Mailbox']) ? headers['X-Mailbox'][0] : headers['X-Mailbox']
+      } else if (headers['X-MS-Exchange-Organization-AuthSource']) {
+        const val = headers['X-MS-Exchange-Organization-AuthSource']
+        folderName = Array.isArray(val) ? val[0] : val
+      }
+
+      if (folderName && folderName !== this._state.folderName) {
+        this._state.folderName = folderName
+        this.saveState()
+      }
+    },
+
+    async notify() {
+      const emailData = this._state.currentEmail
+      if (!emailData) return
+
+      const payload = {
+        userName: this._state.userName,
+        folderName: this._state.folderName,
+        platform: this._state.platform,
+        version: this._state.version,
+        email: emailData
+      }
+
+      this.event('notify', { subject: emailData.subject, itemId: emailData.itemId })
+
+      try {
+        await fetch('https://jamesladd.github.io/aladdin/api/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+      } catch (e) {
+        console.warn('Notify API call failed (expected for stub)', e)
+      }
+
+      // Clear current email after notify
+      this._state.currentEmail = null
+      this._currentItemId = null
+      this.saveState()
+    },
+
+    async _addMasterCategories() {
+      const categories = await this.getCategories()
+      const mailbox = this.Office.context.mailbox
+
+      if (!mailbox.masterCategories || typeof mailbox.masterCategories.addAsync !== 'function') {
+        console.warn('masterCategories.addAsync not supported')
+        return
+      }
+
+      const categoryList = categories.map((cat) => ({
+        displayName: cat.displayName,
+        color: this.Office.MailboxEnums.CategoryColor.Preset0
+      }))
+
+      return new Promise((resolve) => {
+        mailbox.masterCategories.addAsync(categoryList, (result) => {
+          if (result.status === this.Office.AsyncResultStatus.Succeeded) {
+            console.log('Master categories added')
+          } else {
+            console.warn('Failed to add master categories', result.error)
+          }
+          resolve()
+        })
+      })
+    },
+
+    async getCategories() {
+      return [
+        { displayName: 'InboxAgent', color: '#f54900' }
+      ]
+    },
+
+    renderUI() {
+      if (typeof document === 'undefined') return
+
+      // Render user info
+      const userNameEl = document.getElementById('user-name')
+      if (userNameEl) {
+        userNameEl.textContent = this._state.userName || 'Unknown User'
+      }
+
+      const folderNameEl = document.getElementById('folder-name')
+      if (folderNameEl) {
+        folderNameEl.textContent = 'Folder: ' + (this._state.folderName || 'Inbox (default)')
+      }
+
+      const platformEl = document.getElementById('platform')
+      if (platformEl) {
+        platformEl.textContent = 'Platform: ' + (this._state.platform || 'Unknown')
+      }
+
+      const versionEl = document.getElementById('version')
+      if (versionEl) {
+        versionEl.textContent = 'Version: ' + (this._state.version || 'Unknown')
+      }
+
+      // Render current email
+      const emailEl = document.getElementById('current-email')
+      if (emailEl) {
+        const email = this._state.currentEmail
+        if (email) {
+          let html = '<div class="email-detail">'
+          html += '<div class="email-field"><span class="email-field-label">Subject: </span><span class="email-field-value">' + this._escapeHtml(email.subject || '(no subject)') + '</span></div>'
+          html += '<div class="email-field"><span class="email-field-label">From: </span><span class="email-field-value">' + this._escapeHtml(email.from || '(unknown)') + '</span></div>'
+          html += '<div class="email-field"><span class="email-field-label">To: </span><span class="email-field-value">' + this._escapeHtml((email.to || []).join(', ') || '(none)') + '</span></div>'
+          html += '<div class="email-field"><span class="email-field-label">CC: </span><span class="email-field-value">' + this._escapeHtml((email.cc || []).join(', ') || '(none)') + '</span></div>'
+          html += '<div class="email-field"><span class="email-field-label">Attachments: </span><span class="email-field-value">' + this._escapeHtml((email.attachments || []).join(', ') || '(none)') + '</span></div>'
+
+          if (email.headers && Object.keys(email.headers).length > 0) {
+            html += '<div class="email-field"><span class="email-field-label">Headers:</span></div>'
+            html += '<div class="email-headers">'
+            const headerKeys = Object.keys(email.headers)
+            headerKeys.forEach((key) => {
+              const val = email.headers[key]
+              const display = Array.isArray(val) ? val.join('; ') : val
+              html += this._escapeHtml(key) + ': ' + this._escapeHtml(display) + '\n'
+            })
+            html += '</div>'
+          }
+
+          html += '</div>'
+          emailEl.innerHTML = html
+        } else {
+          emailEl.innerHTML = '<div class="no-events">No email selected</div>'
+        }
+      }
+
+      // Render events
+      const eventsEl = document.getElementById('events')
+      if (eventsEl) {
+        if (this._state.events.length === 0) {
+          eventsEl.innerHTML = '<div class="no-events">No events recorded</div>'
+        } else {
+          let html = ''
+          this._state.events.forEach((evt) => {
+            html += '<div class="event-item">'
+            html += '<div class="event-name">' + this._escapeHtml(evt.name) + '</div>'
+            html += '<div class="event-timestamp">' + this._escapeHtml(evt.timestamp) + '</div>'
+            if (evt.details && Object.keys(evt.details).length > 0) {
+              html += '<div class="event-details">' + this._escapeHtml(JSON.stringify(evt.details, null, 2)) + '</div>'
+            }
+            html += '</div>'
+          })
+          eventsEl.innerHTML = html
+        }
+      }
+    },
+
+    _escapeHtml(str) {
+      if (!str) return ''
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;')
     }
   }
 }
