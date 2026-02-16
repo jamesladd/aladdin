@@ -65,6 +65,8 @@ function aladdin(Office) {
               this._state = JSON.parse(e.newValue)
               if (this._state.capturedEmail && this._state.capturedEmail.itemId) {
                 this._currentItemId = this._state.capturedEmail.itemId
+              } else {
+                this._currentItemId = null
               }
               this.updateUI()
             } catch (err) {
@@ -73,6 +75,24 @@ function aladdin(Office) {
           }
         })
       }
+    },
+
+    _reloadAndCheckCapturedEmail() {
+      try {
+        const stored = localStorage.getItem('aladdin_state')
+        if (stored) {
+          const parsed = JSON.parse(stored)
+          if (!parsed.capturedEmail) {
+            this._state.capturedEmail = null
+            this._currentItemId = null
+            return null
+          }
+          return parsed.capturedEmail
+        }
+      } catch (e) {
+        // fall through
+      }
+      return this._state.capturedEmail
     },
 
     event(name, details) {
@@ -109,7 +129,7 @@ function aladdin(Office) {
     },
 
     async _notifyPreviousIfNeeded() {
-      const previousEmail = this._state.capturedEmail
+      const previousEmail = this._reloadAndCheckCapturedEmail()
       if (!previousEmail) return
 
       const mailbox = this.Office.context.mailbox
@@ -171,7 +191,6 @@ function aladdin(Office) {
 
       this.event('initialized', { userName, folder, platform: String(platform), version })
 
-      // Notify previous email if context has changed (compose, no item, different item)
       await this._notifyPreviousIfNeeded()
 
       this._registerMailboxHandlers()
@@ -250,10 +269,9 @@ function aladdin(Office) {
     async _onItemChanged(eventArgs) {
       this.event('ItemChanged', eventArgs || {})
 
-      const previousItemId = this._currentItemId
-      const previousEmail = this._state.capturedEmail
+      const previousEmail = this._reloadAndCheckCapturedEmail()
 
-      if (previousItemId && previousEmail) {
+      if (previousEmail) {
         await this.notify(previousEmail)
         this._state.capturedEmail = null
         this._currentItemId = null
@@ -280,24 +298,15 @@ function aladdin(Office) {
 
       const emailData = {}
 
-      // To
       emailData.to = await this._getRecipientField(item, 'to')
-      // From
       emailData.from = await this._getFromField(item)
-      // CC
       emailData.cc = await this._getRecipientField(item, 'cc')
-      // Subject
       emailData.subject = await this._getStringField(item, 'subject')
-      // Attachments
       emailData.attachments = this._getAttachmentNames(item)
-      // Categories
       emailData.categories = await this._getCategoriesField(item)
-      // Importance
       emailData.importance = item.importance || 'normal'
-      // Sentiment
       emailData.sentiment = this._deriveSentiment(emailData.importance)
 
-      // Message ID for Graph API
       emailData.itemId = null
       if (item.itemId) {
         try {
@@ -310,7 +319,6 @@ function aladdin(Office) {
         }
       }
 
-      // Internet headers
       emailData.internetHeaders = {}
       if (typeof item.getAllInternetHeadersAsync === 'function') {
         try {
