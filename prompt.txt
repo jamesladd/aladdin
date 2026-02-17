@@ -560,7 +560,7 @@ Update the files to enable the addin to do the following:
 3. Get the name of the current inbox or folder and show that after the current user. Use the internet headers to try to extract folder information when available.
 4. Get the Office context platform and show that after the current inbox.
 5. Get the Office version and show that after the platform.
-6. On initialization of the addin, call the intialize function passing in the name of the current user, name of the current inbox / folder,
+6. On initialization of the addin, call the intialize function passing in the name of the current user, email address, name of the current inbox / folder,
    the office platform and version.
 7. When an email is selected capture the following email item information:
    a. To
@@ -584,12 +584,15 @@ Update the files to enable the addin to do the following:
 13. When the add-in is initialized call getCategories to get a list of categories that must be added to the list of masterCategories.
     getCategories should be passed the all the information captured in 2, 3, 4 and 5.
     The API end-point for this POST is /api/inboxinit
-14. Do not create a poll for changes for e.g. setInterval. Assume the regular raising of events keep things in sync.
-15. Check for getAsync before using async methods to get item fields: To, From, Subject, CC, categories and flags; and use async if available.
-16. You MUST register event handlers at the correct API level: use Office.context.mailbox.addHandlerAsync() for mailbox-level events (ItemChanged, OfficeThemeChanged) and use Office.context.mailbox.item.addHandlerAsync() for item-level events (RecipientsChanged, AttachmentsChanged, RecurrenceChanged, AppointmentTimeChanged, EnhancedLocationsChanged), and you MUST check that Office.context.mailbox.item exists before attempting to register item-level event handlers.
-17. You MUST only register events that are actually supported by the Outlook Javascript API.
-18. You Must only keep the last 10 events.
-19. You log the name of the event passed to the event function to the console.
+14. getCategories returns an array of values in the form { displayName: 'string', color: 'string' }, e.g. [{ displayName: 'InboxAgent', color: 'Preset22' }].
+    The color values must be mapped to an Office.MailboxEnums.CategoryColor value before being passed to masterCategories.
+15. Do not create a poll for changes for e.g. setInterval. Assume the regular raising of events keep things in sync.
+16. Check for getAsync before using async methods to get item fields: To, From, Subject, CC, categories and flags; and use async if available.
+17. You MUST register event handlers at the correct API level: use Office.context.mailbox.addHandlerAsync() for mailbox-level events (ItemChanged, OfficeThemeChanged) and use Office.context.mailbox.item.addHandlerAsync() for item-level events (RecipientsChanged, AttachmentsChanged, RecurrenceChanged, AppointmentTimeChanged, EnhancedLocationsChanged), and you MUST check that Office.context.mailbox.item exists before attempting to register item-level event handlers.
+18. You MUST only register events that are actually supported by the Outlook Javascript API.
+19. You Must only keep the last 10 events.
+20. You log the name of the event passed to the event function to the console.
+21. Use https://www.devappeggio.com as the base url for posts to /api/inboxinit and /api/inboxnotify
 
 Rule R1: Explicitly detect compose mode as a distinct state transition. When the add-in detects it is in compose mode (item exists but has no itemId), treat this as an explicit deselection event — re-read state from localStorage, notify the previously captured email if present, and clear it. Do not rely solely on ItemChanged or re-initialization to handle compose transitions.
 Handle compose as a first-class path in both initialize() and ItemChanged handling, separate from the noItem and differentItem cases.
