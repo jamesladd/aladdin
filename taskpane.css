@@ -35,54 +35,25 @@ body {
     margin-bottom: 8px;
 }
 
-.user-detail {
-    font-size: 14px;
-    opacity: 0.9;
-    font-weight: 400;
-    margin-top: 4px;
-}
-
-.email-info {
-    background: white;
-    padding: 15px;
-    border-radius: 8px;
-    margin-bottom: 20px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.email-subject {
-    font-size: 16px;
-    font-weight: 600;
-    color: #333;
-    margin-bottom: 10px;
-}
-
-.email-detail {
+.info-row {
     font-size: 13px;
-    color: #555;
-    margin-bottom: 4px;
-}
-
-.email-id {
-    font-family: 'Courier New', monospace;
-    font-size: 11px;
-    color: #888;
-    word-break: break-all;
-    margin-top: 8px;
-}
-
-.no-email {
-    text-align: center;
-    color: #999;
-    padding: 20px;
-    font-style: italic;
-}
-
-.platform {
-    font-size: 14px;
     opacity: 0.9;
-    font-weight: 400;
     margin-top: 4px;
+}
+
+.info-label {
+    font-weight: 600;
+}
+
+.status {
+    background: white;
+    padding: 12px 16px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+    border-left: 4px solid #764ba2;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    font-weight: 500;
+    color: #555;
 }
 
 .section-title {
@@ -143,21 +114,6 @@ body {
     color: #999;
     padding: 40px 20px;
     font-style: italic;
-}
-
-#status {
-    padding: 10px;
-    text-align: center;
-    font-weight: 600;
-    margin-bottom: 15px;
-    border-radius: 6px;
-    background: #fff3cd;
-    color: #856404;
-}
-
-.status-ready {
-    background: #d4edda !important;
-    color: #155724 !important;
 }
 
 /* Responsive adjustments */
