@@ -41,9 +41,6 @@ function aladdin(Office) {
           const parsed = JSON.parse(raw)
           this._state = parsed
           if (!this._state.events) this._state.events = []
-          if (this._state.capturedEmail) {
-            this._currentItemId = this._state.capturedEmail.graphMessageId || null
-          }
         }
       } catch (e) {
         console.error('loadState error', e)
@@ -79,66 +76,88 @@ function aladdin(Office) {
       this._updateUI()
     },
     async initialize() {
-      const mailbox = this.Office.context.mailbox
-      const userInfo = {
-        userName: this._getUserName(),
-        userEmail: this._getUserEmail(),
-        folderName: 'Unknown',
-        platform: this._getPlatform(),
-        version: this._getVersion()
-      }
-      this._state.userInfo = userInfo
-      this.saveState()
-      this._updateUI()
-
-      // Register mailbox-level events
-      this._registerMailboxEvents()
-
-      // Rule R3: Check if there is a previously captured email that needs notification
-      this.loadState()
-      const previousEmail = this._state.capturedEmail
-      const item = mailbox.item
-
-      if (previousEmail) {
-        let shouldNotify = false
-        if (!item) {
-          shouldNotify = true
-        } else if (!item.itemId) {
-          // Compose mode - Rule R1
-          shouldNotify = true
-        } else {
-          const currentId = this._getGraphId(item.itemId)
-          if (currentId !== previousEmail.graphMessageId) {
-            shouldNotify = true
-          }
+      try {
+        const mailbox = this.Office.context.mailbox
+        const userInfo = {
+          userName: this._getUserName(),
+          userEmail: this._getUserEmail(),
+          folderName: 'Unknown',
+          platform: this._getPlatform(),
+          version: this._getVersion()
         }
-        if (shouldNotify) {
-          await this.notify(previousEmail)
-          this._state.capturedEmail = null
-          this._currentItemId = null
+        this._state.userInfo = userInfo
+        this.saveState()
+        this._updateUI()
+
+        // Register mailbox-level events
+        this._registerMailboxEvents()
+
+        // Rule R3: Check if there is a previously captured email that needs notification
+        this.loadState()
+        // Restore userInfo since loadState may have loaded stale state without it
+        if (!this._state.userInfo) {
+          this._state.userInfo = userInfo
           this.saveState()
         }
-      }
+        const previousEmail = this._state.capturedEmail
+        const item = mailbox.item
 
-      // Process current item
-      if (item) {
-        if (item.itemId) {
-          // Read mode - capture email
-          await this._captureCurrentItem(item)
-          this._registerItemEvents(item)
-          // Try to get folder from headers
-          await this._updateFolderFromHeaders(item)
-        } else {
-          // Compose mode - Rule R1
-          this.event('ComposeMode', { status: 'composing new email' })
+        if (previousEmail) {
+          let shouldNotify = false
+          if (!item) {
+            shouldNotify = true
+          } else if (!item.itemId) {
+            shouldNotify = true
+          } else {
+            const currentId = this._getGraphId(item.itemId)
+            if (currentId !== previousEmail.graphMessageId) {
+              shouldNotify = true
+            }
+          }
+          if (shouldNotify) {
+            try {
+              await this.notify(previousEmail)
+            } catch (e) {
+              console.error('notify error during init', e)
+            }
+            this._state.capturedEmail = null
+            this._currentItemId = null
+            this.saveState()
+          }
         }
-      } else {
-        this.event('NoItem', { status: 'no item selected' })
+
+        // Process current item
+        if (item) {
+          if (item.itemId) {
+            try {
+              await this._captureCurrentItem(item)
+            } catch (e) {
+              console.error('captureCurrentItem error', e)
+            }
+            this._registerItemEvents(item)
+            try {
+              await this._updateFolderFromHeaders(item)
+            } catch (e) {
+              console.error('updateFolderFromHeaders error', e)
+            }
+          } else {
+            this.event('ComposeMode', { status: 'composing new email' })
+          }
+        } else {
+          this.event('NoItem', { status: 'no item selected' })
+        }
+
+        // Initialize categories (Rule R4)
+        try {
+          await this._initCategories()
+        } catch (e) {
+          console.error('initCategories error', e)
+        }
+      } catch (e) {
+        console.error('initialize error', e)
       }
 
-      // Initialize categories (Rule R4)
-      await this._initCategories()
-
+      // Always update UI at the end
       this._updateUI()
     },
     async notify(emailData) {
@@ -151,7 +170,7 @@ function aladdin(Office) {
           body: JSON.stringify(emailData)
         })
       } catch (e) {
-        console.error('notify error', e)
+        console.error('notify fetch error', e)
       }
     },
     async getCategories(info) {
@@ -191,7 +210,13 @@ function aladdin(Office) {
     },
     _getPlatform() {
       try {
-        return this.Office.context.platform || 'Unknown'
+        if (this.Office.context.diagnostics && this.Office.context.diagnostics.platform) {
+          return this.Office.context.diagnostics.platform
+        }
+        if (this.Office.context.platform) {
+          return this.Office.context.platform
+        }
+        return 'Unknown'
       } catch (e) {
         return 'Unknown'
       }
@@ -213,7 +238,7 @@ function aladdin(Office) {
           return this.Office.context.mailbox.convertToRestId(itemId, this.Office.MailboxEnums.RestVersion.v2_0)
         }
       } catch (e) {
-        console.error('convertToRestId error', e)
+        console.error('convertToRestId error, using raw itemId', e)
       }
       return itemId
     },
@@ -221,7 +246,6 @@ function aladdin(Office) {
       const mailbox = this.Office.context.mailbox
       const EventType = this.Office.EventType
 
-      // ItemChanged - mailbox level
       if (EventType.ItemChanged) {
         try {
           mailbox.addHandlerAsync(EventType.ItemChanged, (eventArgs) => {
@@ -232,7 +256,6 @@ function aladdin(Office) {
         }
       }
 
-      // OfficeThemeChanged - mailbox level
       if (EventType.OfficeThemeChanged) {
         try {
           mailbox.addHandlerAsync(EventType.OfficeThemeChanged, (eventArgs) => {
@@ -262,7 +285,6 @@ function aladdin(Office) {
           try {
             item.addHandlerAsync(EventType[evtName], (eventArgs) => {
               this.event(evtName, eventArgs)
-              // Re-capture on relevant changes
               if (evtName === 'RecipientsChanged' || evtName === 'AttachmentsChanged') {
                 this._captureCurrentItem(this.Office.context.mailbox.item)
               }
@@ -288,7 +310,6 @@ function aladdin(Office) {
         if (!item) {
           shouldNotify = true
         } else if (!item.itemId) {
-          // Compose mode - Rule R1
           shouldNotify = true
         } else {
           const currentId = this._getGraphId(item.itemId)
@@ -301,7 +322,11 @@ function aladdin(Office) {
           this.loadState()
           if (this._state.capturedEmail &&
             this._state.capturedEmail.graphMessageId === previousEmail.graphMessageId) {
-            await this.notify(previousEmail)
+            try {
+              await this.notify(previousEmail)
+            } catch (e) {
+              console.error('notify error during item change', e)
+            }
             this._state.capturedEmail = null
             this._currentItemId = null
             this.saveState()
@@ -312,11 +337,18 @@ function aladdin(Office) {
       // Process new item
       if (item) {
         if (item.itemId) {
-          await this._captureCurrentItem(item)
+          try {
+            await this._captureCurrentItem(item)
+          } catch (e) {
+            console.error('captureCurrentItem error', e)
+          }
           this._registerItemEvents(item)
-          await this._updateFolderFromHeaders(item)
+          try {
+            await this._updateFolderFromHeaders(item)
+          } catch (e) {
+            console.error('updateFolderFromHeaders error', e)
+          }
         } else {
-          // Compose mode - Rule R1
           this.event('ComposeMode', { status: 'composing new email' })
         }
       } else {
@@ -342,37 +374,73 @@ function aladdin(Office) {
         internetHeaders: {}
       }
 
-      // To - requirement 16: check for getAsync
-      email.to = await this._getFieldAsync(item, 'to')
+      // To
+      try {
+        email.to = await this._getRecipientsField(item, 'to')
+      } catch (e) {
+        console.error('Error getting To', e)
+      }
 
       // From
-      email.from = await this._getFromAsync(item)
+      try {
+        email.from = await this._getFromField(item)
+      } catch (e) {
+        console.error('Error getting From', e)
+      }
 
       // CC
-      email.cc = await this._getFieldAsync(item, 'cc')
+      try {
+        email.cc = await this._getRecipientsField(item, 'cc')
+      } catch (e) {
+        console.error('Error getting CC', e)
+      }
 
       // Subject
-      email.subject = await this._getSubjectAsync(item)
+      try {
+        email.subject = await this._getSubjectField(item)
+      } catch (e) {
+        console.error('Error getting Subject', e)
+      }
 
       // Attachments
-      if (item.attachments) {
-        email.attachments = item.attachments.map(function(a) { return a.name })
+      try {
+        if (item.attachments) {
+          email.attachments = item.attachments.map(function(a) { return a.name })
+        }
+      } catch (e) {
+        console.error('Error getting Attachments', e)
       }
 
       // Categories
-      email.categories = await this._getCategoriesAsync(item)
+      try {
+        email.categories = await this._getCategoriesField(item)
+      } catch (e) {
+        console.error('Error getting Categories', e)
+      }
 
       // Importance
-      email.importance = item.importance || 'normal'
+      try {
+        email.importance = item.importance || 'normal'
+      } catch (e) {
+        email.importance = 'normal'
+      }
 
       // Internet headers
-      email.internetHeaders = await this._getInternetHeaders(item)
+      try {
+        email.internetHeaders = await this._getInternetHeaders(item)
+      } catch (e) {
+        console.error('Error getting Internet Headers', e)
+      }
 
       // Sentiment from headers
-      if (email.internetHeaders['X-MS-Exchange-Organization-SCL']) {
-        const scl = parseInt(email.internetHeaders['X-MS-Exchange-Organization-SCL'], 10)
-        if (scl >= 5) email.sentiment = 'negative'
-        else if (scl >= 0) email.sentiment = 'neutral'
+      try {
+        if (email.internetHeaders['X-MS-Exchange-Organization-SCL']) {
+          const scl = parseInt(email.internetHeaders['X-MS-Exchange-Organization-SCL'], 10)
+          if (scl >= 5) email.sentiment = 'negative'
+          else if (scl >= 0) email.sentiment = 'neutral'
+        }
+      } catch (e) {
+        console.error('Error parsing sentiment', e)
       }
 
       this._currentItemId = email.graphMessageId
@@ -381,40 +449,43 @@ function aladdin(Office) {
       this.event('EmailCaptured', { subject: email.subject, graphMessageId: email.graphMessageId })
       this._updateUI()
     },
-    async _getFieldAsync(item, fieldName) {
+    async _getRecipientsField(item, fieldName) {
       const field = item[fieldName]
       if (!field) return []
-      if (field.getAsync) {
+      if (typeof field === 'object' && field.getAsync) {
         return new Promise((resolve) => {
           field.getAsync((result) => {
             if (result.status === this.Office.AsyncResultStatus.Succeeded) {
               resolve(this._formatRecipients(result.value))
             } else {
-              resolve(this._formatRecipients(field))
+              resolve([])
             }
           })
         })
       }
-      return this._formatRecipients(field)
+      if (Array.isArray(field)) {
+        return this._formatRecipients(field)
+      }
+      return []
     },
-    async _getFromAsync(item) {
+    async _getFromField(item) {
       const from = item.from
       if (!from) return null
-      if (from.getAsync) {
+      if (typeof from === 'object' && from.getAsync) {
         return new Promise((resolve) => {
           from.getAsync((result) => {
             if (result.status === this.Office.AsyncResultStatus.Succeeded) {
               const v = result.value
               resolve(v ? { name: v.displayName || '', email: v.emailAddress || '' } : null)
             } else {
-              resolve(this._formatFrom(from))
+              resolve(null)
             }
           })
         })
       }
       return this._formatFrom(from)
     },
-    async _getSubjectAsync(item) {
+    async _getSubjectField(item) {
       const subject = item.subject
       if (subject && typeof subject === 'object' && subject.getAsync) {
         return new Promise((resolve) => {
@@ -422,27 +493,28 @@ function aladdin(Office) {
             if (result.status === this.Office.AsyncResultStatus.Succeeded) {
               resolve(result.value || '')
             } else {
-              resolve(typeof subject === 'string' ? subject : '')
+              resolve('')
             }
           })
         })
       }
       return typeof subject === 'string' ? subject : ''
     },
-    async _getCategoriesAsync(item) {
+    async _getCategoriesField(item) {
       if (!item.categories) return []
-      if (item.categories.getAsync) {
+      if (typeof item.categories === 'object' && item.categories.getAsync) {
         return new Promise((resolve) => {
           item.categories.getAsync((result) => {
             if (result.status === this.Office.AsyncResultStatus.Succeeded) {
               resolve(result.value || [])
             } else {
-              resolve(Array.isArray(item.categories) ? item.categories : [])
+              resolve([])
             }
           })
         })
       }
-      return Array.isArray(item.categories) ? item.categories : []
+      if (Array.isArray(item.categories)) return item.categories
+      return []
     },
     async _getInternetHeaders(item) {
       if (!item.getAllInternetHeadersAsync) return {}
@@ -459,7 +531,6 @@ function aladdin(Office) {
     _parseHeaders(headerString) {
       const headers = {}
       if (!headerString) return headers
-      // Unfold continued headers (lines starting with whitespace)
       const unfolded = headerString.replace(/\r?\n[ \t]+/g, ' ')
       const lines = unfolded.split(/\r?\n/)
       lines.forEach(function(line) {
@@ -493,8 +564,13 @@ function aladdin(Office) {
         folderName = headers['X-Folder']
       } else if (headers['X-MS-Exchange-Organization-AuthSource']) {
         folderName = headers['X-MS-Exchange-Organization-AuthSource']
-      } else if (item.parentFolderId) {
-        folderName = item.parentFolderId
+      }
+      try {
+        if (item.parentFolderId && folderName === 'Unknown') {
+          folderName = item.parentFolderId
+        }
+      } catch (e) {
+        console.error('Error reading parentFolderId', e)
       }
       if (this._state.userInfo) {
         this._state.userInfo.folderName = folderName
@@ -518,7 +594,6 @@ function aladdin(Office) {
 
       if (!categories || categories.length === 0) return
 
-      // Map color strings to CategoryColor enum values
       const mapped = categories.map((cat) => {
         return {
           displayName: cat.displayName,
@@ -526,7 +601,6 @@ function aladdin(Office) {
         }
       })
 
-      // Add to master categories
       try {
         const mailbox = this.Office.context.mailbox
         if (mailbox.masterCategories && mailbox.masterCategories.addAsync) {
@@ -542,71 +616,62 @@ function aladdin(Office) {
           })
         }
       } catch (e) {
-        console.error('_initCategories error', e)
+        console.error('_initCategories masterCategories error', e)
       }
 
       this._state._lastCategoryInit = now
       this.saveState()
     },
     _mapCategoryColor(colorString) {
-      if (!colorString) return this.Office.MailboxEnums.CategoryColor.None
-      const CategoryColor = this.Office.MailboxEnums.CategoryColor
-      if (!CategoryColor) return colorString
-
-      // If it's already a valid enum key, use it directly
-      if (CategoryColor[colorString] !== undefined) {
-        return CategoryColor[colorString]
-      }
-
-      // Try matching PresetN pattern
-      const match = colorString.match(/^Preset(\d+)$/i)
-      if (match) {
-        const presetKey = 'Preset' + match[1]
-        if (CategoryColor[presetKey] !== undefined) {
-          return CategoryColor[presetKey]
+      if (!colorString) return 0
+      try {
+        const CategoryColor = this.Office.MailboxEnums.CategoryColor
+        if (!CategoryColor) return colorString
+        if (CategoryColor[colorString] !== undefined) {
+          return CategoryColor[colorString]
         }
+        const match = colorString.match(/^Preset(\d+)$/i)
+        if (match) {
+          const presetKey = 'Preset' + match[1]
+          if (CategoryColor[presetKey] !== undefined) {
+            return CategoryColor[presetKey]
+          }
+        }
+        return CategoryColor.None || 0
+      } catch (e) {
+        return 0
       }
-
-      return CategoryColor.None || 0
     },
     _updateUI() {
       if (typeof document === 'undefined') return
 
-      // Update user info
       const userNameEl = document.getElementById('userName')
       const folderNameEl = document.getElementById('folderName')
       const platformEl = document.getElementById('platform')
       const versionEl = document.getElementById('version')
-      const statusEl = document.getElementById('status')
       const eventsEl = document.getElementById('events')
 
       const info = this._state.userInfo
 
-      if (userNameEl && info) {
-        userNameEl.textContent = info.userName + ' (' + info.userEmail + ')'
-      }
-      if (folderNameEl && info) {
-        folderNameEl.textContent = info.folderName || 'Unknown'
-      }
-      if (platformEl && info) {
-        platformEl.textContent = info.platform || 'Unknown'
-      }
-      if (versionEl && info) {
-        versionEl.textContent = info.version || 'Unknown'
-      }
-
-      // Update status
-      if (statusEl) {
-        if (this._state.capturedEmail) {
-          statusEl.textContent = 'Tracking: ' + (this._state.capturedEmail.subject || '(no subject)')
+      if (userNameEl) {
+        if (info) {
+          userNameEl.textContent = info.userName + ' (' + info.userEmail + ')'
         } else {
-          statusEl.textContent = 'No email selected'
+          userNameEl.textContent = 'Loading...'
         }
       }
+      if (folderNameEl) {
+        folderNameEl.textContent = (info && info.folderName) ? info.folderName : 'Unknown'
+      }
+      if (platformEl) {
+        platformEl.textContent = (info && info.platform) ? info.platform : 'Unknown'
+      }
+      if (versionEl) {
+        versionEl.textContent = (info && info.version) ? info.version : 'Unknown'
+      }
 
-      // Update events
       if (eventsEl) {
-        if (this._state.events.length === 0) {
+        if (!this._state.events || this._state.events.length === 0) {
           eventsEl.innerHTML = '<div class="no-events">No events recorded yet</div>'
         } else {
           let html = ''

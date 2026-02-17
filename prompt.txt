@@ -609,3 +609,16 @@ User navigates away from any email (no item)
 Taskpane re-activates in a different context
 
 Rule R4: The /api/inboxinit POST (called via getCategories() inside _initCategories()) and the subsequent _ensureMasterCategories() call must only execute once every 8 hours. The timestamp of the last successful execution must be persisted in state under _lastCategoryInit and checked at the start of _initCategories(). If less than 8 hours have elapsed since the last execution, the entire _initCategories() method must return early without making any API call or modifying master categories. The 8-hour window must survive across taskpane activations via localStorage persistence.
+
+Rule R5: User information (userName, userEmail, folderName, platform, version) must be computed synchronously from Office.context at the start of initialize() and immediately written to both _state.userInfo and the DOM before any async work or loadState() call occurs. When loadState() is called later in initialize() to check for previously captured email state, it must preserve the already-set _state.userInfo by saving it before the loadState() call and restoring it after. Specifically:
+
+Compute userInfo from Office.context synchronously.
+Set _state.userInfo = userInfo and call _updateUI() immediately — this guarantees the DOM shows correct data before any async operation.
+When loadState() is subsequently called to read capturedEmail or other persisted state, follow this pattern:
+
+const currentUserInfo = this._state.userInfo
+this.loadState()
+this._state.userInfo = currentUserInfo
+
+Every try/catch block wrapping an async step inside initialize() and _handleItemChanged() must call _updateUI() in its catch path so that a failure in any async step never leaves the UI in a stale state.
+The final _updateUI() call at the end of initialize() must be in a finally block to guarantee execution regardless of errors.
