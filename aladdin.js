@@ -232,12 +232,6 @@ function aladdin(Office) {
       this.saveState()
       this._updateUI()
     },
-    copyToClipboard(text, buttonElement) {
-      this._copyToClipboard(text, buttonElement)
-    },
-    copyAllContact(buttonElement) {
-      this._copyAllContact(buttonElement)
-    },
 
     // Private methods
 
@@ -748,147 +742,10 @@ function aladdin(Office) {
         return false
       }
     },
-    _copyToClipboard(text, buttonElement) {
-      if (!text) return
-
-      // Use execCommand approach exclusively for Office Add-ins
-      // The Clipboard API is blocked by permissions policy in iframes
-      const textArea = document.createElement('textarea')
-      textArea.value = text
-      textArea.style.position = 'fixed'
-      textArea.style.top = '0'
-      textArea.style.left = '0'
-      textArea.style.width = '2em'
-      textArea.style.height = '2em'
-      textArea.style.padding = '0'
-      textArea.style.border = 'none'
-      textArea.style.outline = 'none'
-      textArea.style.boxShadow = 'none'
-      textArea.style.background = 'transparent'
-
-      document.body.appendChild(textArea)
-      textArea.focus()
-      textArea.select()
-
-      try {
-        const successful = document.execCommand('copy')
-        if (successful) {
-          this._showCopyFeedback(buttonElement)
-        } else {
-          console.error('execCommand copy failed')
-        }
-      } catch (err) {
-        console.error('Copy failed', err)
-      }
-
-      document.body.removeChild(textArea)
-    },
-    _showCopyFeedback(buttonElement) {
-      if (!buttonElement) return
-
-      const originalHTML = buttonElement.innerHTML
-      buttonElement.innerHTML = '✓'
-      buttonElement.classList.add('copied')
-
-      setTimeout(() => {
-        buttonElement.innerHTML = originalHTML
-        buttonElement.classList.remove('copied')
-      }, 1500)
-    },
-    _copyAllContact(buttonElement) {
-      const contact = this._state.contactInfo
-      if (!contact) return
-
-      let text = ''
-
-      // Build formatted text with all contact fields
-      if (contact.Firstname || contact.Surname) {
-        text += 'Name: ' + (contact.Firstname || '') + ' ' + (contact.Surname || '') + '\n'
-      }
-      if (contact.VIPStatus) {
-        text += 'VIP Status: Yes\n'
-      }
-      if (contact.JobTitle) {
-        text += 'Job Title: ' + contact.JobTitle + '\n'
-      }
-      if (contact.Company) {
-        text += 'Company: ' + contact.Company + '\n'
-      }
-      if (contact.Mobile) {
-        text += 'Mobile: ' + contact.Mobile + '\n'
-      }
-      if (contact.AccountNo) {
-        text += 'Account No: ' + contact.AccountNo + '\n'
-      }
-      if (contact.UID) {
-        text += 'UID: ' + contact.UID + '\n'
-      }
-      if (contact.EmailAddress) {
-        text += 'Email: ' + contact.EmailAddress + '\n'
-      }
-      if (contact.EmailNameAlias) {
-        text += 'Email Alias: ' + contact.EmailNameAlias + '\n'
-      }
-      if (contact.Street1) {
-        text += 'Street1: ' + contact.Street1 + '\n'
-      }
-      if (contact.Street2) {
-        text += 'Street2: ' + contact.Street2 + '\n'
-      }
-      if (contact.City) {
-        text += 'City: ' + contact.City + '\n'
-      }
-      if (contact.PostCode) {
-        text += 'PostCode: ' + contact.PostCode + '\n'
-      }
-      if (contact.Linkedin) {
-        text += 'LinkedIn: ' + contact.Linkedin + '\n'
-      }
-      if (contact.X) {
-        text += 'X: ' + contact.X + '\n'
-      }
-      if (contact.Facebook) {
-        text += 'Facebook: ' + contact.Facebook + '\n'
-      }
-      if (contact.Instagram) {
-        text += 'Instagram: ' + contact.Instagram + '\n'
-      }
-      if (contact.OtherChan1) {
-        text += 'Other Channel 1: ' + contact.OtherChan1 + '\n'
-      }
-      if (contact.OtherChan2) {
-        text += 'Other Channel 2: ' + contact.OtherChan2 + '\n'
-      }
-      if (contact.SubscriberAttr1) {
-        text += 'Subscriber Attr 1: ' + contact.SubscriberAttr1 + '\n'
-      }
-      if (contact.SubscriberAttr2) {
-        text += 'Subscriber Attr 2: ' + contact.SubscriberAttr2 + '\n'
-      }
-      if (contact.SubscriberAttr3) {
-        text += 'Subscriber Attr 3: ' + contact.SubscriberAttr3 + '\n'
-      }
-      if (contact.SubscriberAttr4) {
-        text += 'Subscriber Attr 4: ' + contact.SubscriberAttr4 + '\n'
-      }
-      if (contact.CreatedAt) {
-        text += 'Created: ' + this._formatTimestamp(contact.CreatedAt) + '\n'
-      }
-      if (contact.UpdatedAt) {
-        text += 'Updated: ' + this._formatTimestamp(contact.UpdatedAt) + '\n'
-      }
-      if (contact.LastContactedAt) {
-        text += 'Last Contacted: ' + this._formatTimestamp(contact.LastContactedAt) + '\n'
-      }
-
-      this._copyToClipboard(text.trim(), buttonElement)
-    },
-    _createCopyableField(label, value, isUrl) {
+    _createContactField(label, value, isUrl) {
       if (!value) return ''
 
-      const uniqueId = 'copy_' + Math.random().toString(36).substr(2, 9)
       let html = '<div class="contact-field">'
-      html += '<span class="field-content">'
       html += '<span class="field-label">' + this._escapeHtml(label) + ':</span> '
 
       if (isUrl && this._isUrl(value)) {
@@ -898,40 +755,9 @@ function aladdin(Office) {
         html += '<span class="field-value">' + this._escapeHtml(value) + '</span>'
       }
 
-      html += '</span>'
-      html += '<button class="copy-btn" data-copy-id="' + uniqueId + '" data-copy-value="' +
-        this._escapeHtml(value) + '" title="Copy to clipboard">'
-      html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">'
-      html += '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>'
-      html += '<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>'
-      html += '</svg>'
-      html += '</button>'
       html += '</div>'
 
       return html
-    },
-    _attachCopyListeners() {
-      if (typeof document === 'undefined') return
-
-      const copyButtons = document.querySelectorAll('.copy-btn')
-      copyButtons.forEach((btn) => {
-        btn.onclick = (e) => {
-          e.preventDefault()
-          e.stopPropagation()
-          const value = btn.getAttribute('data-copy-value')
-          this.copyToClipboard(value, btn)
-        }
-      })
-
-      // Attach copy-all listener
-      const copyAllBtn = document.getElementById('copyAllContactBtn')
-      if (copyAllBtn) {
-        copyAllBtn.onclick = (e) => {
-          e.preventDefault()
-          e.stopPropagation()
-          this.copyAllContact(copyAllBtn)
-        }
-      }
     },
     _updateUI() {
       if (typeof document === 'undefined') return
@@ -941,7 +767,6 @@ function aladdin(Office) {
       const platformEl = document.getElementById('platform')
       const versionEl = document.getElementById('version')
       const contactSectionEl = document.getElementById('contactSection')
-      const sectionTitleEl = document.querySelector('.section-title-container')
 
       const info = this._state.userInfo
 
@@ -962,22 +787,6 @@ function aladdin(Office) {
         versionEl.textContent = (info && info.version) ? info.version : 'Unknown'
       }
 
-      // Update section title with copy all button
-      if (sectionTitleEl) {
-        const contact = this._state.contactInfo
-        if (contact) {
-          sectionTitleEl.innerHTML = '<span class="section-title">Contact</span>' +
-            '<button id="copyAllContactBtn" class="copy-all-btn" title="Copy all contact info">' +
-            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
-            '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>' +
-            '<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>' +
-            '</svg>' +
-            '</button>'
-        } else {
-          sectionTitleEl.innerHTML = '<span class="section-title">Contact</span>'
-        }
-      }
-
       // Update contact section
       if (contactSectionEl) {
         const contact = this._state.contactInfo
@@ -993,63 +802,63 @@ function aladdin(Office) {
             html += '<div class="vip-badge">VIP</div>'
           }
 
-          html += this._createCopyableField('Job Title', contact.JobTitle, false)
-          html += this._createCopyableField('Company', contact.Company, false)
-          html += this._createCopyableField('Mobile', contact.Mobile, false)
-          html += this._createCopyableField('Account No', contact.AccountNo, false)
+          html += this._createContactField('Job Title', contact.JobTitle, false)
+          html += this._createContactField('Company', contact.Company, false)
+          html += this._createContactField('Mobile', contact.Mobile, false)
+          html += this._createContactField('Account No', contact.AccountNo, false)
 
           // More/Less toggle
           if (this._state.showMoreContact) {
             html += '<div class="contact-more">'
-            html += this._createCopyableField('UID', contact.UID, false)
-            html += this._createCopyableField('Email', contact.EmailAddress, false)
-            html += this._createCopyableField('Email Alias', contact.EmailNameAlias, false)
-            html += this._createCopyableField('Street1', contact.Street1, false)
-            html += this._createCopyableField('Street2', contact.Street2, false)
-            html += this._createCopyableField('City', contact.City, false)
-            html += this._createCopyableField('PostCode', contact.PostCode, false)
+            html += this._createContactField('UID', contact.UID, false)
+            html += this._createContactField('Email', contact.EmailAddress, false)
+            html += this._createContactField('Email Alias', contact.EmailNameAlias, false)
+            html += this._createContactField('Street1', contact.Street1, false)
+            html += this._createContactField('Street2', contact.Street2, false)
+            html += this._createContactField('City', contact.City, false)
+            html += this._createContactField('PostCode', contact.PostCode, false)
 
             if (contact.Linkedin) {
-              html += this._createCopyableField('LinkedIn', contact.Linkedin, true)
+              html += this._createContactField('LinkedIn', contact.Linkedin, true)
             }
             if (contact.X) {
-              html += this._createCopyableField('X', contact.X, true)
+              html += this._createContactField('X', contact.X, true)
             }
             if (contact.Facebook) {
-              html += this._createCopyableField('Facebook', contact.Facebook, true)
+              html += this._createContactField('Facebook', contact.Facebook, true)
             }
             if (contact.Instagram) {
-              html += this._createCopyableField('Instagram', contact.Instagram, true)
+              html += this._createContactField('Instagram', contact.Instagram, true)
             }
 
             if (contact.OtherChan1) {
-              html += this._createCopyableField('Other Channel 1', contact.OtherChan1, false)
+              html += this._createContactField('Other Channel 1', contact.OtherChan1, false)
             }
             if (contact.OtherChan2) {
-              html += this._createCopyableField('Other Channel 2', contact.OtherChan2, false)
+              html += this._createContactField('Other Channel 2', contact.OtherChan2, false)
             }
             if (contact.SubscriberAttr1) {
-              html += this._createCopyableField('Subscriber Attr 1', contact.SubscriberAttr1, false)
+              html += this._createContactField('Subscriber Attr 1', contact.SubscriberAttr1, false)
             }
             if (contact.SubscriberAttr2) {
-              html += this._createCopyableField('Subscriber Attr 2', contact.SubscriberAttr2, false)
+              html += this._createContactField('Subscriber Attr 2', contact.SubscriberAttr2, false)
             }
             if (contact.SubscriberAttr3) {
-              html += this._createCopyableField('Subscriber Attr 3', contact.SubscriberAttr3, false)
+              html += this._createContactField('Subscriber Attr 3', contact.SubscriberAttr3, false)
             }
             if (contact.SubscriberAttr4) {
-              html += this._createCopyableField('Subscriber Attr 4', contact.SubscriberAttr4, false)
+              html += this._createContactField('Subscriber Attr 4', contact.SubscriberAttr4, false)
             }
 
             // Timestamp fields
             if (contact.CreatedAt) {
-              html += this._createCopyableField('Created', this._formatTimestamp(contact.CreatedAt), false)
+              html += this._createContactField('Created', this._formatTimestamp(contact.CreatedAt), false)
             }
             if (contact.UpdatedAt) {
-              html += this._createCopyableField('Updated', this._formatTimestamp(contact.UpdatedAt), false)
+              html += this._createContactField('Updated', this._formatTimestamp(contact.UpdatedAt), false)
             }
             if (contact.LastContactedAt) {
-              html += this._createCopyableField('Last Contacted', this._formatTimestamp(contact.LastContactedAt), false)
+              html += this._createContactField('Last Contacted', this._formatTimestamp(contact.LastContactedAt), false)
             }
             html += '</div>'
             html += '<button id="toggleContactBtn" class="toggle-btn">Less</button>'
@@ -1067,9 +876,6 @@ function aladdin(Office) {
               this.toggleMoreContact()
             }
           }
-
-          // Attach copy button listeners
-          this._attachCopyListeners()
         } else {
           contactSectionEl.innerHTML = '<div class="no-contact">No contact information available</div>'
         }
