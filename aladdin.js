@@ -8,8 +8,6 @@ export function createAladdin(Office) {
   const instance = aladdin(Office)
   if (typeof window !== 'undefined') window.aladdinInstance = instance;
   if (typeof window === 'undefined') singleton[0] = instance;
-  instance.loadState()
-  instance.watchState()
   return instance
 }
 
@@ -21,8 +19,8 @@ function aladdin(Office) {
     _state: {
       events: [],
       capturedEmail: null,
-      userInfo: null,
       contactInfo: null,
+      userInfo: null,
       _lastCategoryInit: null
     },
     state() {
@@ -74,13 +72,12 @@ function aladdin(Office) {
         this._state.events = this._state.events.slice(-10)
       }
       this.saveState()
-      this._updateUI()
     },
     async initialize() {
       try {
         const mailbox = this.Office.context.mailbox
 
-        // Rule R5: Compute userInfo synchronously and set immediately
+        // Rule R5: Compute and set userInfo synchronously first
         const userInfo = {
           userName: this._getUserName(),
           userEmail: this._getUserEmail(),
@@ -89,46 +86,52 @@ function aladdin(Office) {
           version: this._getVersion()
         }
         this._state.userInfo = userInfo
-        this.saveState()
         this._updateUI()
 
         // Register mailbox-level events
         this._registerMailboxEvents()
 
-        // Rule R3: Check if there is a previously captured email that needs notification
+        // Rule R3 & R2: Check for previously captured email
         const currentUserInfo = this._state.userInfo
         this.loadState()
         this._state.userInfo = currentUserInfo
+        this.saveState()
 
         const previousEmail = this._state.capturedEmail
         const item = mailbox.item
 
         if (previousEmail) {
           let shouldNotify = false
-          if (!item) {
-            // No item selected
+
+          // Rule R1: Explicit compose mode detection
+          if (item && !item.itemId) {
             shouldNotify = true
-          } else if (!item.itemId) {
-            // Compose mode (Rule R1)
+            this.event('ComposeDetectedInit', { status: 'compose mode detected on init' })
+          } else if (!item) {
             shouldNotify = true
-          } else {
-            // Different item
+          } else if (item.itemId) {
             const currentId = this._getGraphId(item.itemId)
             if (currentId !== previousEmail.graphMessageId) {
               shouldNotify = true
             }
           }
+
           if (shouldNotify) {
-            try {
-              await this.notify(previousEmail)
-            } catch (e) {
-              console.error('notify error during init', e)
+            // Rule R2: Re-read before notify
+            this.loadState()
+            if (this._state.capturedEmail &&
+              this._state.capturedEmail.graphMessageId === previousEmail.graphMessageId) {
+              try {
+                await this.notify(previousEmail)
+              } catch (e) {
+                console.error('notify error during init', e)
+              }
+              this._state.capturedEmail = null
+              this._state.contactInfo = null
+              this._currentItemId = null
+              this.saveState()
               this._updateUI()
             }
-            this._state.capturedEmail = null
-            this._state.contactInfo = null
-            this._currentItemId = null
-            this.saveState()
           }
         }
 
@@ -149,32 +152,33 @@ function aladdin(Office) {
               console.error('updateFolderFromHeaders error', e)
               this._updateUI()
             }
-            try {
-              await this._fetchContactInfo(item)
-            } catch (e) {
-              console.error('fetchContactInfo error', e)
-              this._updateUI()
-            }
           } else {
-            // Compose mode (Rule R1)
+            // Rule R1: Compose mode
             this.event('ComposeMode', { status: 'composing new email' })
+            this._state.contactInfo = null
+            this._updateUI()
           }
         } else {
           this.event('NoItem', { status: 'no item selected' })
+          this._state.contactInfo = null
+          this._updateUI()
         }
 
-        // Initialize categories (Rule R4)
+        // Rule R4: Initialize categories (8-hour throttle)
         try {
           await this._initCategories()
         } catch (e) {
           console.error('initCategories error', e)
           this._updateUI()
         }
+
+        // Watch for state changes
+        this.watchState()
+
       } catch (e) {
         console.error('initialize error', e)
         this._updateUI()
       } finally {
-        // Always update UI at the end
         this._updateUI()
       }
     },
@@ -209,13 +213,13 @@ function aladdin(Office) {
         { displayName: 'InboxAgent', color: 'Preset22' }
       ]
     },
-    async getContact(fromEmail) {
-      if (!fromEmail) return null
+    async getContact(emailAddress) {
+      if (!emailAddress) return null
       try {
         const response = await fetch('https://www.devappeggio.com/api/inboxcontact', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: fromEmail })
+          body: JSON.stringify({ emailAddress })
         })
         if (response.ok) {
           const data = await response.json()
@@ -281,6 +285,7 @@ function aladdin(Office) {
       const mailbox = this.Office.context.mailbox
       const EventType = this.Office.EventType
 
+      // Mailbox-level events
       if (EventType.ItemChanged) {
         try {
           mailbox.addHandlerAsync(EventType.ItemChanged, (eventArgs) => {
@@ -307,6 +312,8 @@ function aladdin(Office) {
       this._itemHandlersRegistered = true
 
       const EventType = this.Office.EventType
+
+      // Item-level events
       const itemEvents = [
         'RecipientsChanged',
         'AttachmentsChanged',
@@ -321,7 +328,9 @@ function aladdin(Office) {
             item.addHandlerAsync(EventType[evtName], (eventArgs) => {
               this.event(evtName, eventArgs)
               if (evtName === 'RecipientsChanged' || evtName === 'AttachmentsChanged') {
-                this._captureCurrentItem(this.Office.context.mailbox.item)
+                this._captureCurrentItem(this.Office.context.mailbox.item).catch((e) => {
+                  console.error('captureCurrentItem error in event', e)
+                })
               }
             })
           } catch (e) {
@@ -331,87 +340,87 @@ function aladdin(Office) {
       })
     },
     async _handleItemChanged(eventArgs) {
-      this._itemHandlersRegistered = false
-      this.event('ItemChanged', { type: 'item changed' })
+      try {
+        this._itemHandlersRegistered = false
+        this.event('ItemChanged', { type: 'item changed' })
 
-      // Rule R2: Re-read state from localStorage
-      const currentUserInfo = this._state.userInfo
-      this.loadState()
-      this._state.userInfo = currentUserInfo
+        // Rule R2: Re-read state before processing
+        const currentUserInfo = this._state.userInfo
+        this.loadState()
+        this._state.userInfo = currentUserInfo
 
-      const previousEmail = this._state.capturedEmail
+        const previousEmail = this._state.capturedEmail
+        const item = this.Office.context.mailbox.item
 
-      const item = this.Office.context.mailbox.item
+        if (previousEmail) {
+          let shouldNotify = false
 
-      if (previousEmail) {
-        let shouldNotify = false
-        if (!item) {
-          // No item
-          shouldNotify = true
-        } else if (!item.itemId) {
-          // Compose mode (Rule R1)
-          shouldNotify = true
-        } else {
-          // Different item
-          const currentId = this._getGraphId(item.itemId)
-          if (currentId !== previousEmail.graphMessageId) {
+          // Rule R1: Explicit compose mode detection
+          if (item && !item.itemId) {
             shouldNotify = true
+            this.event('ComposeDetectedChange', { status: 'compose mode detected on change' })
+          } else if (!item) {
+            shouldNotify = true
+          } else if (item.itemId) {
+            const currentId = this._getGraphId(item.itemId)
+            if (currentId !== previousEmail.graphMessageId) {
+              shouldNotify = true
+            }
           }
-        }
-        if (shouldNotify) {
-          // Rule R2: Re-read before notify to prevent double-notify
-          const rereadUserInfo = this._state.userInfo
-          this.loadState()
-          this._state.userInfo = rereadUserInfo
 
-          if (this._state.capturedEmail &&
-            this._state.capturedEmail.graphMessageId === previousEmail.graphMessageId) {
-            try {
-              await this.notify(previousEmail)
-            } catch (e) {
-              console.error('notify error during item change', e)
+          if (shouldNotify) {
+            // Rule R2: Re-read before notify
+            this.loadState()
+            if (this._state.capturedEmail &&
+              this._state.capturedEmail.graphMessageId === previousEmail.graphMessageId) {
+              try {
+                await this.notify(previousEmail)
+              } catch (e) {
+                console.error('notify error during item change', e)
+              }
+              this._state.capturedEmail = null
+              this._state.contactInfo = null
+              this._currentItemId = null
+              this.saveState()
               this._updateUI()
             }
-            this._state.capturedEmail = null
-            this._state.contactInfo = null
-            this._currentItemId = null
-            this.saveState()
           }
         }
-      }
 
-      // Process new item
-      if (item) {
-        if (item.itemId) {
-          // Read mode
-          try {
-            await this._captureCurrentItem(item)
-          } catch (e) {
-            console.error('captureCurrentItem error', e)
-            this._updateUI()
-          }
-          this._registerItemEvents(item)
-          try {
-            await this._updateFolderFromHeaders(item)
-          } catch (e) {
-            console.error('updateFolderFromHeaders error', e)
-            this._updateUI()
-          }
-          try {
-            await this._fetchContactInfo(item)
-          } catch (e) {
-            console.error('fetchContactInfo error', e)
+        // Process new item
+        if (item) {
+          if (item.itemId) {
+            try {
+              await this._captureCurrentItem(item)
+            } catch (e) {
+              console.error('captureCurrentItem error', e)
+              this._updateUI()
+            }
+            this._registerItemEvents(item)
+            try {
+              await this._updateFolderFromHeaders(item)
+            } catch (e) {
+              console.error('updateFolderFromHeaders error', e)
+              this._updateUI()
+            }
+          } else {
+            // Rule R1: Compose mode
+            this.event('ComposeMode', { status: 'composing new email' })
+            this._state.contactInfo = null
             this._updateUI()
           }
         } else {
-          // Compose mode (Rule R1)
-          this.event('ComposeMode', { status: 'composing new email' })
+          this.event('NoItem', { status: 'no item selected' })
+          this._state.contactInfo = null
+          this._updateUI()
         }
-      } else {
-        this.event('NoItem', { status: 'no item selected' })
-      }
 
-      this._updateUI()
+      } catch (e) {
+        console.error('handleItemChanged error', e)
+        this._updateUI()
+      } finally {
+        this._updateUI()
+      }
     },
     async _captureCurrentItem(item) {
       if (!item) return
@@ -503,7 +512,21 @@ function aladdin(Office) {
       this._state.capturedEmail = email
       this.saveState()
       this.event('EmailCaptured', { subject: email.subject, graphMessageId: email.graphMessageId })
-      this._updateUI()
+
+      // Fetch contact info
+      if (email.from && email.from.email) {
+        try {
+          const contact = await this.getContact(email.from.email)
+          this._state.contactInfo = contact
+          this.saveState()
+          this._updateUI()
+        } catch (e) {
+          console.error('Error getting contact', e)
+          this._updateUI()
+        }
+      } else {
+        this._updateUI()
+      }
     },
     async _getRecipientsField(item, fieldName) {
       const field = item[fieldName]
@@ -634,18 +657,6 @@ function aladdin(Office) {
         this._updateUI()
       }
     },
-    async _fetchContactInfo(item) {
-      if (!item) return
-      const from = await this._getFromField(item)
-      if (!from || !from.email) return
-
-      const contactInfo = await this.getContact(from.email)
-      if (contactInfo) {
-        this._state.contactInfo = contactInfo
-        this.saveState()
-        this._updateUI()
-      }
-    },
     async _initCategories() {
       // Rule R4: Only run once every 8 hours
       const EIGHT_HOURS = 8 * 60 * 60 * 1000
@@ -714,19 +725,19 @@ function aladdin(Office) {
       if (typeof document === 'undefined') return
 
       const userNameEl = document.getElementById('userName')
+      const userEmailEl = document.getElementById('userEmail')
       const folderNameEl = document.getElementById('folderName')
       const platformEl = document.getElementById('platform')
       const versionEl = document.getElementById('version')
-      const contactSection = document.getElementById('contactSection')
+      const contactEl = document.getElementById('contactInfo')
 
       const info = this._state.userInfo
 
       if (userNameEl) {
-        if (info) {
-          userNameEl.textContent = info.userName + ' (' + info.userEmail + ')'
-        } else {
-          userNameEl.textContent = 'Loading...'
-        }
+        userNameEl.textContent = (info && info.userName) ? info.userName : 'Loading...'
+      }
+      if (userEmailEl) {
+        userEmailEl.textContent = (info && info.userEmail) ? info.userEmail : 'Loading...'
       }
       if (folderNameEl) {
         folderNameEl.textContent = (info && info.folderName) ? info.folderName : 'Unknown'
@@ -738,23 +749,139 @@ function aladdin(Office) {
         versionEl.textContent = (info && info.version) ? info.version : 'Unknown'
       }
 
-      // Update contact section
-      if (contactSection) {
-        const contactInfo = this._state.contactInfo
-        if (contactInfo) {
-          let html = '<div class="contact-item">'
-          html += '<div class="contact-name">' + (contactInfo.fullname || 'Unknown') + '</div>'
-          if (contactInfo.mobile) {
-            html += '<div class="contact-detail">Mobile: ' + contactInfo.mobile + '</div>'
+      if (contactEl) {
+        this._displayContact(contactEl)
+      }
+    },
+    _displayContact(containerEl) {
+      const contact = this._state.contactInfo
+      if (!contact) {
+        containerEl.innerHTML = '<div class="no-contact">No contact information available</div>'
+        return
+      }
+
+      let html = '<div class="contact-container">'
+
+      // Primary fields (always visible)
+      html += '<div class="contact-primary">'
+      html += '<div class="contact-field"><span class="contact-label">Name:</span> ' +
+        this._escapeHtml((contact.Firstname || '') + ' ' + (contact.Surname || '')) + '</div>'
+      html += '<div class="contact-field"><span class="contact-label">Mobile:</span> ' +
+        this._escapeHtml(contact.Mobile || 'N/A') + '</div>'
+      html += '<div class="contact-field"><span class="contact-label">Job Title:</span> ' +
+        this._escapeHtml(contact.JobTitle || 'N/A') + '</div>'
+      html += '<div class="contact-field"><span class="contact-label">Company:</span> ' +
+        this._escapeHtml(contact.Company || 'N/A') + '</div>'
+      html += '<div class="contact-field"><span class="contact-label">VIP Status:</span> ' +
+        (contact.Vipstatus ? 'Yes' : 'No') + '</div>'
+      html += '<div class="contact-field"><span class="contact-label">Account No:</span> ' +
+        this._escapeHtml(contact.AccountNo || 'N/A') + '</div>'
+      html += '</div>'
+
+      // Secondary fields (hidden by default)
+      html += '<div class="contact-secondary" id="contactSecondary" style="display: none;">'
+      html += '<div class="contact-field"><span class="contact-label">UID:</span> ' +
+        this._escapeHtml(contact.UID || 'N/A') + '</div>'
+      html += '<div class="contact-field"><span class="contact-label">Street 1:</span> ' +
+        this._escapeHtml(contact.Street1 || 'N/A') + '</div>'
+      html += '<div class="contact-field"><span class="contact-label">Street 2:</span> ' +
+        this._escapeHtml(contact.Street2 || 'N/A') + '</div>'
+      html += '<div class="contact-field"><span class="contact-label">City:</span> ' +
+        this._escapeHtml(contact.City || 'N/A') + '</div>'
+      html += '<div class="contact-field"><span class="contact-label">PostCode:</span> ' +
+        this._escapeHtml(contact.PostCode || 'N/A') + '</div>'
+      html += '<div class="contact-field"><span class="contact-label">Email:</span> ' +
+        this._escapeHtml(contact.EmailAddress || 'N/A') + '</div>'
+      html += '<div class="contact-field"><span class="contact-label">Email Alias:</span> ' +
+        this._escapeHtml(contact.EmailNameAlias || 'N/A') + '</div>'
+      if (contact.LinkedinL) {
+        html += '<div class="contact-field"><span class="contact-label">LinkedIn:</span> ' +
+          '<a href="' + this._escapeHtml(contact.LinkedinL) + '" target="_blank">View Profile</a></div>'
+      }
+      if (contact.X) {
+        html += '<div class="contact-field"><span class="contact-label">X:</span> ' +
+          '<a href="' + this._escapeHtml(contact.X) + '" target="_blank">View Profile</a></div>'
+      }
+      if (contact.Facebook) {
+        html += '<div class="contact-field"><span class="contact-label">Facebook:</span> ' +
+          '<a href="' + this._escapeHtml(contact.Facebook) + '" target="_blank">View Profile</a></div>'
+      }
+      if (contact.Instagram) {
+        html += '<div class="contact-field"><span class="contact-label">Instagram:</span> ' +
+          '<a href="' + this._escapeHtml(contact.Instagram) + '" target="_blank">View Profile</a></div>'
+      }
+      if (contact.SubscriberAttr1) {
+        html += '<div class="contact-field"><span class="contact-label">Attr 1:</span> ' +
+          this._escapeHtml(contact.SubscriberAttr1) + '</div>'
+      }
+      if (contact.SubscriberAttr2) {
+        html += '<div class="contact-field"><span class="contact-label">Attr 2:</span> ' +
+          this._escapeHtml(contact.SubscriberAttr2) + '</div>'
+      }
+      if (contact.SubscriberAttr3) {
+        html += '<div class="contact-field"><span class="contact-label">Attr 3:</span> ' +
+          this._escapeHtml(contact.SubscriberAttr3) + '</div>'
+      }
+      if (contact.SubscriberAttr4) {
+        html += '<div class="contact-field"><span class="contact-label">Attr 4:</span> ' +
+          this._escapeHtml(contact.SubscriberAttr4) + '</div>'
+      }
+      if (contact.OtherChan1) {
+        html += '<div class="contact-field"><span class="contact-label">Other 1:</span> ' +
+          this._escapeHtml(contact.OtherChan1) + '</div>'
+      }
+      if (contact.OtherChan2) {
+        html += '<div class="contact-field"><span class="contact-label">Other 2:</span> ' +
+          this._escapeHtml(contact.OtherChan2) + '</div>'
+      }
+      if (contact.CreatedAt) {
+        html += '<div class="contact-field"><span class="contact-label">Created:</span> ' +
+          this._formatDate(contact.CreatedAt) + '</div>'
+      }
+      if (contact.UpdatedAt) {
+        html += '<div class="contact-field"><span class="contact-label">Updated:</span> ' +
+          this._formatDate(contact.UpdatedAt) + '</div>'
+      }
+      if (contact.LastContactedAt) {
+        html += '<div class="contact-field"><span class="contact-label">Last Contacted:</span> ' +
+          this._formatDate(contact.LastContactedAt) + '</div>'
+      }
+      html += '</div>'
+
+      // More button
+      html += '<button class="contact-more-btn" id="contactMoreBtn">More</button>'
+      html += '</div>'
+
+      containerEl.innerHTML = html
+
+      // Attach event listener
+      const moreBtn = document.getElementById('contactMoreBtn')
+      const secondaryEl = document.getElementById('contactSecondary')
+      if (moreBtn && secondaryEl) {
+        moreBtn.addEventListener('click', () => {
+          if (secondaryEl.style.display === 'none') {
+            secondaryEl.style.display = 'block'
+            moreBtn.textContent = 'Less'
+          } else {
+            secondaryEl.style.display = 'none'
+            moreBtn.textContent = 'More'
           }
-          if (contactInfo.vip) {
-            html += '<div class="contact-vip">VIP</div>'
-          }
-          html += '</div>'
-          contactSection.innerHTML = html
-        } else {
-          contactSection.innerHTML = '<div class="no-contact">No contact information available</div>'
-        }
+        })
+      }
+    },
+    _escapeHtml(str) {
+      if (!str) return ''
+      const div = document.createElement('div')
+      div.textContent = str
+      return div.innerHTML
+    },
+    _formatDate(timestamp) {
+      if (!timestamp) return 'N/A'
+      try {
+        const date = new Date(timestamp)
+        return date.toLocaleString()
+      } catch (e) {
+        return String(timestamp)
       }
     }
   }

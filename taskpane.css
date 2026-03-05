@@ -32,7 +32,13 @@ body {
 .user-name {
     font-size: 18px;
     font-weight: 600;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
+}
+
+.user-email {
+    font-size: 14px;
+    opacity: 0.9;
+    margin-bottom: 12px;
 }
 
 .info-row {
@@ -52,40 +58,53 @@ body {
     color: #555;
 }
 
-.contact-section {
+.contact-container {
     background: white;
     padding: 15px;
     border-radius: 6px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-.contact-item {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+.contact-primary {
+    margin-bottom: 10px;
 }
 
-.contact-name {
-    font-size: 16px;
+.contact-secondary {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #e0e0e0;
+}
+
+.contact-field {
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
+.contact-label {
     font-weight: 600;
     color: #667eea;
+    margin-right: 5px;
 }
 
-.contact-detail {
-    font-size: 14px;
-    color: #666;
-}
-
-.contact-vip {
-    display: inline-block;
-    background: #ff6b6b;
+.contact-more-btn {
+    background: #667eea;
     color: white;
-    padding: 4px 12px;
-    border-radius: 12px;
-    font-size: 12px;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
     font-weight: 600;
-    text-transform: uppercase;
-    width: fit-content;
+    margin-top: 10px;
+    transition: background 0.2s;
+}
+
+.contact-more-btn:hover {
+    background: #5568d3;
+}
+
+.contact-more-btn:active {
+    background: #4451b8;
 }
 
 .no-contact {
@@ -93,6 +112,15 @@ body {
     color: #999;
     padding: 20px;
     font-style: italic;
+}
+
+.contact-field a {
+    color: #667eea;
+    text-decoration: none;
+}
+
+.contact-field a:hover {
+    text-decoration: underline;
 }
 
 /* Responsive adjustments */
