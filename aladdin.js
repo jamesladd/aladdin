@@ -715,6 +715,33 @@ function aladdin(Office) {
         return 0
       }
     },
+    _formatTimestamp(timestamp) {
+      if (!timestamp) return ''
+      try {
+        const date = new Date(timestamp)
+        if (isNaN(date.getTime())) return ''
+
+        const day = String(date.getDate()).padStart(2, '0')
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const year = date.getFullYear()
+        const hours = String(date.getHours()).padStart(2, '0')
+        const minutes = String(date.getMinutes()).padStart(2, '0')
+        const seconds = String(date.getSeconds()).padStart(2, '0')
+
+        return day + '/' + month + '/' + year + ' ' + hours + ':' + minutes + ':' + seconds
+      } catch (e) {
+        return ''
+      }
+    },
+    _isUrl(str) {
+      if (!str) return false
+      try {
+        const url = new URL(str)
+        return url.protocol === 'http:' || url.protocol === 'https:'
+      } catch (e) {
+        return false
+      }
+    },
     _updateUI() {
       if (typeof document === 'undefined') return
 
@@ -784,22 +811,49 @@ function aladdin(Office) {
               this._escapeHtml(contact.City || '') + '</div>'
             html += '<div class="contact-field"><span class="field-label">PostCode:</span> ' +
               this._escapeHtml(contact.PostCode || '') + '</div>'
+
+            // Social media fields with URL links
             if (contact.Linkedin) {
-              html += '<div class="contact-field"><span class="field-label">LinkedIn:</span> ' +
-                this._escapeHtml(contact.Linkedin) + '</div>'
+              html += '<div class="contact-field"><span class="field-label">LinkedIn:</span> '
+              if (this._isUrl(contact.Linkedin)) {
+                html += '<a href="' + this._escapeHtml(contact.Linkedin) + '" target="_blank" rel="noopener noreferrer">' +
+                  this._escapeHtml(contact.Linkedin) + '</a>'
+              } else {
+                html += this._escapeHtml(contact.Linkedin)
+              }
+              html += '</div>'
             }
             if (contact.X) {
-              html += '<div class="contact-field"><span class="field-label">X:</span> ' +
-                this._escapeHtml(contact.X) + '</div>'
+              html += '<div class="contact-field"><span class="field-label">X:</span> '
+              if (this._isUrl(contact.X)) {
+                html += '<a href="' + this._escapeHtml(contact.X) + '" target="_blank" rel="noopener noreferrer">' +
+                  this._escapeHtml(contact.X) + '</a>'
+              } else {
+                html += this._escapeHtml(contact.X)
+              }
+              html += '</div>'
             }
             if (contact.Facebook) {
-              html += '<div class="contact-field"><span class="field-label">Facebook:</span> ' +
-                this._escapeHtml(contact.Facebook) + '</div>'
+              html += '<div class="contact-field"><span class="field-label">Facebook:</span> '
+              if (this._isUrl(contact.Facebook)) {
+                html += '<a href="' + this._escapeHtml(contact.Facebook) + '" target="_blank" rel="noopener noreferrer">' +
+                  this._escapeHtml(contact.Facebook) + '</a>'
+              } else {
+                html += this._escapeHtml(contact.Facebook)
+              }
+              html += '</div>'
             }
             if (contact.Instagram) {
-              html += '<div class="contact-field"><span class="field-label">Instagram:</span> ' +
-                this._escapeHtml(contact.Instagram) + '</div>'
+              html += '<div class="contact-field"><span class="field-label">Instagram:</span> '
+              if (this._isUrl(contact.Instagram)) {
+                html += '<a href="' + this._escapeHtml(contact.Instagram) + '" target="_blank" rel="noopener noreferrer">' +
+                  this._escapeHtml(contact.Instagram) + '</a>'
+              } else {
+                html += this._escapeHtml(contact.Instagram)
+              }
+              html += '</div>'
             }
+
             if (contact.OtherChan1) {
               html += '<div class="contact-field"><span class="field-label">Other Channel 1:</span> ' +
                 this._escapeHtml(contact.OtherChan1) + '</div>'
@@ -824,17 +878,19 @@ function aladdin(Office) {
               html += '<div class="contact-field"><span class="field-label">Subscriber Attr 4:</span> ' +
                 this._escapeHtml(contact.SubscriberAttr4) + '</div>'
             }
+
+            // Timestamp fields
             if (contact.CreatedAt) {
               html += '<div class="contact-field"><span class="field-label">Created:</span> ' +
-                this._escapeHtml(contact.CreatedAt) + '</div>'
+                this._escapeHtml(this._formatTimestamp(contact.CreatedAt)) + '</div>'
             }
             if (contact.UpdatedAt) {
               html += '<div class="contact-field"><span class="field-label">Updated:</span> ' +
-                this._escapeHtml(contact.UpdatedAt) + '</div>'
+                this._escapeHtml(this._formatTimestamp(contact.UpdatedAt)) + '</div>'
             }
             if (contact.LastContactedAt) {
               html += '<div class="contact-field"><span class="field-label">Last Contacted:</span> ' +
-                this._escapeHtml(contact.LastContactedAt) + '</div>'
+                this._escapeHtml(this._formatTimestamp(contact.LastContactedAt)) + '</div>'
             }
             html += '</div>'
             html += '<button id="toggleContactBtn" class="toggle-btn">Less</button>'
