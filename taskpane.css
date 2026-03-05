@@ -45,6 +45,56 @@ body {
     font-weight: 600;
 }
 
+.section-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 15px;
+    color: #555;
+}
+
+.contact-section {
+    background: white;
+    padding: 15px;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.contact-item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.contact-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: #667eea;
+}
+
+.contact-detail {
+    font-size: 14px;
+    color: #666;
+}
+
+.contact-vip {
+    display: inline-block;
+    background: #ff6b6b;
+    color: white;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    width: fit-content;
+}
+
+.no-contact {
+    text-align: center;
+    color: #999;
+    padding: 20px;
+    font-style: italic;
+}
+
 /* Responsive adjustments */
 @media (max-width: 480px) {
     .container {

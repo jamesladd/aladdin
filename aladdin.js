@@ -22,6 +22,7 @@ function aladdin(Office) {
       events: [],
       capturedEmail: null,
       userInfo: null,
+      contactInfo: null,
       _lastCategoryInit: null
     },
     state() {
@@ -79,7 +80,7 @@ function aladdin(Office) {
       try {
         const mailbox = this.Office.context.mailbox
 
-        // Rule R5: Compute and display user info synchronously first
+        // Rule R5: Compute userInfo synchronously and set immediately
         const userInfo = {
           userName: this._getUserName(),
           userEmail: this._getUserEmail(),
@@ -88,12 +89,13 @@ function aladdin(Office) {
           version: this._getVersion()
         }
         this._state.userInfo = userInfo
+        this.saveState()
         this._updateUI()
 
         // Register mailbox-level events
         this._registerMailboxEvents()
 
-        // Rule R3 & R5: Load state but preserve userInfo
+        // Rule R3: Check if there is a previously captured email that needs notification
         const currentUserInfo = this._state.userInfo
         this.loadState()
         this._state.userInfo = currentUserInfo
@@ -101,50 +103,39 @@ function aladdin(Office) {
         const previousEmail = this._state.capturedEmail
         const item = mailbox.item
 
-        // Rule R3: Check if there is a previously captured email that needs notification
         if (previousEmail) {
           let shouldNotify = false
-
           if (!item) {
             // No item selected
             shouldNotify = true
           } else if (!item.itemId) {
-            // Rule R1: Compose mode (item exists but no itemId)
+            // Compose mode (Rule R1)
             shouldNotify = true
-            this.event('ComposeMode', { status: 'composing new email, deselecting previous' })
           } else {
-            // Different item selected
+            // Different item
             const currentId = this._getGraphId(item.itemId)
             if (currentId !== previousEmail.graphMessageId) {
               shouldNotify = true
             }
           }
-
           if (shouldNotify) {
-            // Rule R2: Re-read state before notify
-            this.loadState()
-            // Restore userInfo
-            this._state.userInfo = currentUserInfo
-
-            if (this._state.capturedEmail &&
-              this._state.capturedEmail.graphMessageId === previousEmail.graphMessageId) {
-              try {
-                await this.notify(previousEmail)
-              } catch (e) {
-                console.error('notify error during init', e)
-                this._updateUI()
-              }
-              this._state.capturedEmail = null
-              this._currentItemId = null
-              this.saveState()
+            try {
+              await this.notify(previousEmail)
+            } catch (e) {
+              console.error('notify error during init', e)
+              this._updateUI()
             }
+            this._state.capturedEmail = null
+            this._state.contactInfo = null
+            this._currentItemId = null
+            this.saveState()
           }
         }
 
         // Process current item
         if (item) {
           if (item.itemId) {
-            // Read mode with item
+            // Read mode
             try {
               await this._captureCurrentItem(item)
             } catch (e) {
@@ -158,15 +149,21 @@ function aladdin(Office) {
               console.error('updateFolderFromHeaders error', e)
               this._updateUI()
             }
+            try {
+              await this._fetchContactInfo(item)
+            } catch (e) {
+              console.error('fetchContactInfo error', e)
+              this._updateUI()
+            }
           } else {
-            // Rule R1: Compose mode
+            // Compose mode (Rule R1)
             this.event('ComposeMode', { status: 'composing new email' })
           }
         } else {
           this.event('NoItem', { status: 'no item selected' })
         }
 
-        // Rule R4: Initialize categories (once every 8 hours)
+        // Initialize categories (Rule R4)
         try {
           await this._initCategories()
         } catch (e) {
@@ -177,7 +174,7 @@ function aladdin(Office) {
         console.error('initialize error', e)
         this._updateUI()
       } finally {
-        // Rule R5: Always update UI at the end
+        // Always update UI at the end
         this._updateUI()
       }
     },
@@ -211,6 +208,23 @@ function aladdin(Office) {
       return [
         { displayName: 'InboxAgent', color: 'Preset22' }
       ]
+    },
+    async getContact(fromEmail) {
+      if (!fromEmail) return null
+      try {
+        const response = await fetch('https://www.devappeggio.com/api/inboxcontact', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: fromEmail })
+        })
+        if (response.ok) {
+          const data = await response.json()
+          return data
+        }
+      } catch (e) {
+        console.error('getContact API error', e)
+      }
+      return null
     },
 
     // Private methods
@@ -267,7 +281,6 @@ function aladdin(Office) {
       const mailbox = this.Office.context.mailbox
       const EventType = this.Office.EventType
 
-      // Mailbox-level events
       if (EventType.ItemChanged) {
         try {
           mailbox.addHandlerAsync(EventType.ItemChanged, (eventArgs) => {
@@ -294,8 +307,6 @@ function aladdin(Office) {
       this._itemHandlersRegistered = true
 
       const EventType = this.Office.EventType
-
-      // Item-level events
       const itemEvents = [
         'RecipientsChanged',
         'AttachmentsChanged',
@@ -309,7 +320,6 @@ function aladdin(Office) {
           try {
             item.addHandlerAsync(EventType[evtName], (eventArgs) => {
               this.event(evtName, eventArgs)
-              // Re-capture email on recipient or attachment changes
               if (evtName === 'RecipientsChanged' || evtName === 'AttachmentsChanged') {
                 this._captureCurrentItem(this.Office.context.mailbox.item)
               }
@@ -324,45 +334,35 @@ function aladdin(Office) {
       this._itemHandlersRegistered = false
       this.event('ItemChanged', { type: 'item changed' })
 
-      // Rule R5: Preserve userInfo
-      const currentUserInfo = this._state.userInfo
-
       // Rule R2: Re-read state from localStorage
+      const currentUserInfo = this._state.userInfo
       this.loadState()
-
-      // Rule R5: Restore userInfo
-      if (currentUserInfo) {
-        this._state.userInfo = currentUserInfo
-      }
+      this._state.userInfo = currentUserInfo
 
       const previousEmail = this._state.capturedEmail
+
       const item = this.Office.context.mailbox.item
 
       if (previousEmail) {
         let shouldNotify = false
-
         if (!item) {
-          // No item selected
+          // No item
           shouldNotify = true
         } else if (!item.itemId) {
-          // Rule R1: Compose mode
+          // Compose mode (Rule R1)
           shouldNotify = true
-          this.event('ComposeMode', { status: 'composing new email, deselecting previous' })
         } else {
-          // Different item selected
+          // Different item
           const currentId = this._getGraphId(item.itemId)
           if (currentId !== previousEmail.graphMessageId) {
             shouldNotify = true
           }
         }
-
         if (shouldNotify) {
           // Rule R2: Re-read before notify to prevent double-notify
+          const rereadUserInfo = this._state.userInfo
           this.loadState()
-          // Rule R5: Restore userInfo again
-          if (currentUserInfo) {
-            this._state.userInfo = currentUserInfo
-          }
+          this._state.userInfo = rereadUserInfo
 
           if (this._state.capturedEmail &&
             this._state.capturedEmail.graphMessageId === previousEmail.graphMessageId) {
@@ -373,6 +373,7 @@ function aladdin(Office) {
               this._updateUI()
             }
             this._state.capturedEmail = null
+            this._state.contactInfo = null
             this._currentItemId = null
             this.saveState()
           }
@@ -382,7 +383,7 @@ function aladdin(Office) {
       // Process new item
       if (item) {
         if (item.itemId) {
-          // Read mode with item
+          // Read mode
           try {
             await this._captureCurrentItem(item)
           } catch (e) {
@@ -396,8 +397,14 @@ function aladdin(Office) {
             console.error('updateFolderFromHeaders error', e)
             this._updateUI()
           }
+          try {
+            await this._fetchContactInfo(item)
+          } catch (e) {
+            console.error('fetchContactInfo error', e)
+            this._updateUI()
+          }
         } else {
-          // Rule R1: Compose mode
+          // Compose mode (Rule R1)
           this.event('ComposeMode', { status: 'composing new email' })
         }
       } else {
@@ -627,6 +634,18 @@ function aladdin(Office) {
         this._updateUI()
       }
     },
+    async _fetchContactInfo(item) {
+      if (!item) return
+      const from = await this._getFromField(item)
+      if (!from || !from.email) return
+
+      const contactInfo = await this.getContact(from.email)
+      if (contactInfo) {
+        this._state.contactInfo = contactInfo
+        this.saveState()
+        this._updateUI()
+      }
+    },
     async _initCategories() {
       // Rule R4: Only run once every 8 hours
       const EIGHT_HOURS = 8 * 60 * 60 * 1000
@@ -698,6 +717,7 @@ function aladdin(Office) {
       const folderNameEl = document.getElementById('folderName')
       const platformEl = document.getElementById('platform')
       const versionEl = document.getElementById('version')
+      const contactSection = document.getElementById('contactSection')
 
       const info = this._state.userInfo
 
@@ -716,6 +736,25 @@ function aladdin(Office) {
       }
       if (versionEl) {
         versionEl.textContent = (info && info.version) ? info.version : 'Unknown'
+      }
+
+      // Update contact section
+      if (contactSection) {
+        const contactInfo = this._state.contactInfo
+        if (contactInfo) {
+          let html = '<div class="contact-item">'
+          html += '<div class="contact-name">' + (contactInfo.fullname || 'Unknown') + '</div>'
+          if (contactInfo.mobile) {
+            html += '<div class="contact-detail">Mobile: ' + contactInfo.mobile + '</div>'
+          }
+          if (contactInfo.vip) {
+            html += '<div class="contact-vip">VIP</div>'
+          }
+          html += '</div>'
+          contactSection.innerHTML = html
+        } else {
+          contactSection.innerHTML = '<div class="no-contact">No contact information available</div>'
+        }
       }
     }
   }
