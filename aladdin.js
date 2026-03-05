@@ -751,32 +751,34 @@ function aladdin(Office) {
     _copyToClipboard(text, buttonElement) {
       if (!text) return
 
-      // Modern clipboard API
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(() => {
-          this._showCopyFeedback(buttonElement)
-        }).catch((err) => {
-          console.error('Clipboard copy failed', err)
-          this._fallbackCopy(text, buttonElement)
-        })
-      } else {
-        this._fallbackCopy(text, buttonElement)
-      }
-    },
-    _fallbackCopy(text, buttonElement) {
-      // Fallback for older browsers
+      // Use execCommand approach exclusively for Office Add-ins
+      // The Clipboard API is blocked by permissions policy in iframes
       const textArea = document.createElement('textarea')
       textArea.value = text
       textArea.style.position = 'fixed'
-      textArea.style.left = '-9999px'
+      textArea.style.top = '0'
+      textArea.style.left = '0'
+      textArea.style.width = '2em'
+      textArea.style.height = '2em'
+      textArea.style.padding = '0'
+      textArea.style.border = 'none'
+      textArea.style.outline = 'none'
+      textArea.style.boxShadow = 'none'
+      textArea.style.background = 'transparent'
+
       document.body.appendChild(textArea)
+      textArea.focus()
       textArea.select()
 
       try {
-        document.execCommand('copy')
-        this._showCopyFeedback(buttonElement)
+        const successful = document.execCommand('copy')
+        if (successful) {
+          this._showCopyFeedback(buttonElement)
+        } else {
+          console.error('execCommand copy failed')
+        }
       } catch (err) {
-        console.error('Fallback copy failed', err)
+        console.error('Copy failed', err)
       }
 
       document.body.removeChild(textArea)
