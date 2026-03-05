@@ -235,6 +235,9 @@ function aladdin(Office) {
     copyToClipboard(text, buttonElement) {
       this._copyToClipboard(text, buttonElement)
     },
+    copyAllContact(buttonElement) {
+      this._copyAllContact(buttonElement)
+    },
 
     // Private methods
 
@@ -790,13 +793,101 @@ function aladdin(Office) {
         buttonElement.classList.remove('copied')
       }, 1500)
     },
+    _copyAllContact(buttonElement) {
+      const contact = this._state.contactInfo
+      if (!contact) return
+
+      let text = ''
+
+      // Build formatted text with all contact fields
+      if (contact.Firstname || contact.Surname) {
+        text += 'Name: ' + (contact.Firstname || '') + ' ' + (contact.Surname || '') + '\n'
+      }
+      if (contact.VIPStatus) {
+        text += 'VIP Status: Yes\n'
+      }
+      if (contact.JobTitle) {
+        text += 'Job Title: ' + contact.JobTitle + '\n'
+      }
+      if (contact.Company) {
+        text += 'Company: ' + contact.Company + '\n'
+      }
+      if (contact.Mobile) {
+        text += 'Mobile: ' + contact.Mobile + '\n'
+      }
+      if (contact.AccountNo) {
+        text += 'Account No: ' + contact.AccountNo + '\n'
+      }
+      if (contact.UID) {
+        text += 'UID: ' + contact.UID + '\n'
+      }
+      if (contact.EmailAddress) {
+        text += 'Email: ' + contact.EmailAddress + '\n'
+      }
+      if (contact.EmailNameAlias) {
+        text += 'Email Alias: ' + contact.EmailNameAlias + '\n'
+      }
+      if (contact.Street1) {
+        text += 'Street1: ' + contact.Street1 + '\n'
+      }
+      if (contact.Street2) {
+        text += 'Street2: ' + contact.Street2 + '\n'
+      }
+      if (contact.City) {
+        text += 'City: ' + contact.City + '\n'
+      }
+      if (contact.PostCode) {
+        text += 'PostCode: ' + contact.PostCode + '\n'
+      }
+      if (contact.Linkedin) {
+        text += 'LinkedIn: ' + contact.Linkedin + '\n'
+      }
+      if (contact.X) {
+        text += 'X: ' + contact.X + '\n'
+      }
+      if (contact.Facebook) {
+        text += 'Facebook: ' + contact.Facebook + '\n'
+      }
+      if (contact.Instagram) {
+        text += 'Instagram: ' + contact.Instagram + '\n'
+      }
+      if (contact.OtherChan1) {
+        text += 'Other Channel 1: ' + contact.OtherChan1 + '\n'
+      }
+      if (contact.OtherChan2) {
+        text += 'Other Channel 2: ' + contact.OtherChan2 + '\n'
+      }
+      if (contact.SubscriberAttr1) {
+        text += 'Subscriber Attr 1: ' + contact.SubscriberAttr1 + '\n'
+      }
+      if (contact.SubscriberAttr2) {
+        text += 'Subscriber Attr 2: ' + contact.SubscriberAttr2 + '\n'
+      }
+      if (contact.SubscriberAttr3) {
+        text += 'Subscriber Attr 3: ' + contact.SubscriberAttr3 + '\n'
+      }
+      if (contact.SubscriberAttr4) {
+        text += 'Subscriber Attr 4: ' + contact.SubscriberAttr4 + '\n'
+      }
+      if (contact.CreatedAt) {
+        text += 'Created: ' + this._formatTimestamp(contact.CreatedAt) + '\n'
+      }
+      if (contact.UpdatedAt) {
+        text += 'Updated: ' + this._formatTimestamp(contact.UpdatedAt) + '\n'
+      }
+      if (contact.LastContactedAt) {
+        text += 'Last Contacted: ' + this._formatTimestamp(contact.LastContactedAt) + '\n'
+      }
+
+      this._copyToClipboard(text.trim(), buttonElement)
+    },
     _createCopyableField(label, value, isUrl) {
       if (!value) return ''
 
       const uniqueId = 'copy_' + Math.random().toString(36).substr(2, 9)
       let html = '<div class="contact-field">'
+      html += '<span class="field-content">'
       html += '<span class="field-label">' + this._escapeHtml(label) + ':</span> '
-      html += '<span class="field-value-container">'
 
       if (isUrl && this._isUrl(value)) {
         html += '<a href="' + this._escapeHtml(value) + '" target="_blank" rel="noopener noreferrer">' +
@@ -805,6 +896,7 @@ function aladdin(Office) {
         html += '<span class="field-value">' + this._escapeHtml(value) + '</span>'
       }
 
+      html += '</span>'
       html += '<button class="copy-btn" data-copy-id="' + uniqueId + '" data-copy-value="' +
         this._escapeHtml(value) + '" title="Copy to clipboard">'
       html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">'
@@ -812,7 +904,6 @@ function aladdin(Office) {
       html += '<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>'
       html += '</svg>'
       html += '</button>'
-      html += '</span>'
       html += '</div>'
 
       return html
@@ -829,6 +920,16 @@ function aladdin(Office) {
           this.copyToClipboard(value, btn)
         }
       })
+
+      // Attach copy-all listener
+      const copyAllBtn = document.getElementById('copyAllContactBtn')
+      if (copyAllBtn) {
+        copyAllBtn.onclick = (e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          this.copyAllContact(copyAllBtn)
+        }
+      }
     },
     _updateUI() {
       if (typeof document === 'undefined') return
@@ -838,6 +939,7 @@ function aladdin(Office) {
       const platformEl = document.getElementById('platform')
       const versionEl = document.getElementById('version')
       const contactSectionEl = document.getElementById('contactSection')
+      const sectionTitleEl = document.querySelector('.section-title-container')
 
       const info = this._state.userInfo
 
@@ -856,6 +958,22 @@ function aladdin(Office) {
       }
       if (versionEl) {
         versionEl.textContent = (info && info.version) ? info.version : 'Unknown'
+      }
+
+      // Update section title with copy all button
+      if (sectionTitleEl) {
+        const contact = this._state.contactInfo
+        if (contact) {
+          sectionTitleEl.innerHTML = '<span class="section-title">Contact</span>' +
+            '<button id="copyAllContactBtn" class="copy-all-btn" title="Copy all contact info">' +
+            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+            '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>' +
+            '<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>' +
+            '</svg>' +
+            '</button>'
+        } else {
+          sectionTitleEl.innerHTML = '<span class="section-title">Contact</span>'
+        }
       }
 
       // Update contact section
