@@ -32,13 +32,7 @@ body {
 .user-name {
     font-size: 18px;
     font-weight: 600;
-    margin-bottom: 4px;
-}
-
-.user-email {
-    font-size: 14px;
-    opacity: 0.9;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
 }
 
 .info-row {
@@ -58,69 +52,86 @@ body {
     color: #555;
 }
 
-.contact-container {
-    background: white;
-    padding: 15px;
-    border-radius: 6px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.contact-primary {
-    margin-bottom: 10px;
-}
-
-.contact-secondary {
-    margin-top: 10px;
-    padding-top: 10px;
-    border-top: 1px solid #e0e0e0;
-}
-
-.contact-field {
-    margin-bottom: 8px;
-    font-size: 14px;
-}
-
-.contact-label {
-    font-weight: 600;
-    color: #667eea;
-    margin-right: 5px;
-}
-
-.contact-more-btn {
-    background: #667eea;
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 600;
-    margin-top: 10px;
-    transition: background 0.2s;
-}
-
-.contact-more-btn:hover {
-    background: #5568d3;
-}
-
-.contact-more-btn:active {
-    background: #4451b8;
-}
-
 .no-contact {
     text-align: center;
     color: #999;
-    padding: 20px;
+    padding: 40px 20px;
     font-style: italic;
+    background: white;
+    border-radius: 6px;
 }
 
-.contact-field a {
+#contactInfo {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.contact-summary {
+    margin-bottom: 15px;
+}
+
+.contact-name {
+    font-size: 18px;
+    font-weight: 600;
     color: #667eea;
-    text-decoration: none;
+    margin-bottom: 10px;
 }
 
-.contact-field a:hover {
-    text-decoration: underline;
+.vip-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    margin-left: 10px;
+    letter-spacing: 0.5px;
+}
+
+.contact-field {
+    margin: 8px 0;
+    font-size: 13px;
+    color: #555;
+}
+
+.field-label {
+    font-weight: 600;
+    color: #333;
+    margin-right: 5px;
+}
+
+.contact-details {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #e0e0e0;
+}
+
+.toggle-btn {
+    display: block;
+    width: 100%;
+    margin-top: 15px;
+    padding: 10px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.toggle-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.toggle-btn:active {
+    transform: translateY(0);
 }
 
 /* Responsive adjustments */
@@ -135,5 +146,9 @@ body {
 
     .user-name {
         font-size: 16px;
+    }
+
+    #contactInfo {
+        padding: 15px;
     }
 }
