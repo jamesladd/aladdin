@@ -60,9 +60,9 @@ body {
 
 .copy-all-btn {
     background: transparent;
-    color: #999;
+    color: #666;
     border: none;
-    padding: 4px 8px;
+    padding: 6px;
     border-radius: 4px;
     cursor: pointer;
     transition: all 0.2s;
@@ -72,8 +72,12 @@ body {
 }
 
 .copy-all-btn:hover {
-    background: #f0f0f0;
-    color: #666;
+    background: #e8e8e8;
+    color: #333;
+}
+
+.copy-all-btn:active {
+    transform: scale(0.95);
 }
 
 .copy-all-btn.copied {
@@ -122,6 +126,10 @@ body {
     gap: 8px;
 }
 
+.contact-field:hover .copy-btn {
+    opacity: 1;
+}
+
 .field-content {
     flex: 1;
     min-width: 0;
@@ -133,8 +141,9 @@ body {
 
 .copy-btn {
     flex-shrink: 0;
+    opacity: 0;
     background: transparent;
-    color: #999;
+    color: #666;
     border: none;
     padding: 4px 6px;
     border-radius: 4px;
@@ -145,12 +154,11 @@ body {
     justify-content: center;
     font-size: 12px;
     line-height: 1;
-    margin-left: auto;
 }
 
 .copy-btn:hover {
-    background: #f0f0f0;
-    color: #666;
+    background: #e8e8e8;
+    color: #333;
 }
 
 .copy-btn:active {
@@ -158,6 +166,7 @@ body {
 }
 
 .copy-btn.copied {
+    opacity: 1;
     color: #10b981;
 }
 
@@ -236,5 +245,9 @@ body {
 
     .contact-name {
         font-size: 18px;
+    }
+
+    .copy-btn {
+        opacity: 1;
     }
 }
