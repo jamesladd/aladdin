@@ -45,66 +45,6 @@ body {
     font-weight: 600;
 }
 
-.section-title {
-    font-size: 16px;
-    font-weight: 600;
-    margin-bottom: 15px;
-    color: #555;
-}
-
-.events {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.event-item {
-    background: white;
-    padding: 15px;
-    border-radius: 6px;
-    border-left: 4px solid #667eea;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.event-item:hover {
-    transform: translateX(2px);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-}
-
-.event-name {
-    font-weight: 600;
-    color: #667eea;
-    margin-bottom: 5px;
-    font-size: 14px;
-}
-
-.event-timestamp {
-    font-size: 11px;
-    color: #999;
-    margin-bottom: 8px;
-}
-
-.event-details {
-    font-size: 13px;
-    color: #666;
-    background: #f9f9f9;
-    padding: 8px;
-    border-radius: 4px;
-    font-family: 'Courier New', monospace;
-    white-space: pre-wrap;
-    word-break: break-word;
-    max-height: 200px;
-    overflow-y: auto;
-}
-
-.no-events {
-    text-align: center;
-    color: #999;
-    padding: 40px 20px;
-    font-style: italic;
-}
-
 /* Responsive adjustments */
 @media (max-width: 480px) {
     .container {

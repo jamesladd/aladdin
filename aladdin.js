@@ -78,6 +78,8 @@ function aladdin(Office) {
     async initialize() {
       try {
         const mailbox = this.Office.context.mailbox
+
+        // Rule R5: Compute and display user info synchronously first
         const userInfo = {
           userName: this._getUserName(),
           userEmail: this._getUserEmail(),
@@ -86,79 +88,98 @@ function aladdin(Office) {
           version: this._getVersion()
         }
         this._state.userInfo = userInfo
-        this.saveState()
         this._updateUI()
 
         // Register mailbox-level events
         this._registerMailboxEvents()
 
-        // Rule R3: Check if there is a previously captured email that needs notification
+        // Rule R3 & R5: Load state but preserve userInfo
+        const currentUserInfo = this._state.userInfo
         this.loadState()
-        // Restore userInfo since loadState may have loaded stale state without it
-        if (!this._state.userInfo) {
-          this._state.userInfo = userInfo
-          this.saveState()
-        }
+        this._state.userInfo = currentUserInfo
+
         const previousEmail = this._state.capturedEmail
         const item = mailbox.item
 
+        // Rule R3: Check if there is a previously captured email that needs notification
         if (previousEmail) {
           let shouldNotify = false
+
           if (!item) {
+            // No item selected
             shouldNotify = true
           } else if (!item.itemId) {
+            // Rule R1: Compose mode (item exists but no itemId)
             shouldNotify = true
+            this.event('ComposeMode', { status: 'composing new email, deselecting previous' })
           } else {
+            // Different item selected
             const currentId = this._getGraphId(item.itemId)
             if (currentId !== previousEmail.graphMessageId) {
               shouldNotify = true
             }
           }
+
           if (shouldNotify) {
-            try {
-              await this.notify(previousEmail)
-            } catch (e) {
-              console.error('notify error during init', e)
+            // Rule R2: Re-read state before notify
+            this.loadState()
+            // Restore userInfo
+            this._state.userInfo = currentUserInfo
+
+            if (this._state.capturedEmail &&
+              this._state.capturedEmail.graphMessageId === previousEmail.graphMessageId) {
+              try {
+                await this.notify(previousEmail)
+              } catch (e) {
+                console.error('notify error during init', e)
+                this._updateUI()
+              }
+              this._state.capturedEmail = null
+              this._currentItemId = null
+              this.saveState()
             }
-            this._state.capturedEmail = null
-            this._currentItemId = null
-            this.saveState()
           }
         }
 
         // Process current item
         if (item) {
           if (item.itemId) {
+            // Read mode with item
             try {
               await this._captureCurrentItem(item)
             } catch (e) {
               console.error('captureCurrentItem error', e)
+              this._updateUI()
             }
             this._registerItemEvents(item)
             try {
               await this._updateFolderFromHeaders(item)
             } catch (e) {
               console.error('updateFolderFromHeaders error', e)
+              this._updateUI()
             }
           } else {
+            // Rule R1: Compose mode
             this.event('ComposeMode', { status: 'composing new email' })
           }
         } else {
           this.event('NoItem', { status: 'no item selected' })
         }
 
-        // Initialize categories (Rule R4)
+        // Rule R4: Initialize categories (once every 8 hours)
         try {
           await this._initCategories()
         } catch (e) {
           console.error('initCategories error', e)
+          this._updateUI()
         }
       } catch (e) {
         console.error('initialize error', e)
+        this._updateUI()
+      } finally {
+        // Rule R5: Always update UI at the end
+        this._updateUI()
       }
-
-      // Always update UI at the end
-      this._updateUI()
     },
     async notify(emailData) {
       if (!emailData) return
@@ -246,6 +267,7 @@ function aladdin(Office) {
       const mailbox = this.Office.context.mailbox
       const EventType = this.Office.EventType
 
+      // Mailbox-level events
       if (EventType.ItemChanged) {
         try {
           mailbox.addHandlerAsync(EventType.ItemChanged, (eventArgs) => {
@@ -272,6 +294,8 @@ function aladdin(Office) {
       this._itemHandlersRegistered = true
 
       const EventType = this.Office.EventType
+
+      // Item-level events
       const itemEvents = [
         'RecipientsChanged',
         'AttachmentsChanged',
@@ -285,6 +309,7 @@ function aladdin(Office) {
           try {
             item.addHandlerAsync(EventType[evtName], (eventArgs) => {
               this.event(evtName, eventArgs)
+              // Re-capture email on recipient or attachment changes
               if (evtName === 'RecipientsChanged' || evtName === 'AttachmentsChanged') {
                 this._captureCurrentItem(this.Office.context.mailbox.item)
               }
@@ -299,33 +324,53 @@ function aladdin(Office) {
       this._itemHandlersRegistered = false
       this.event('ItemChanged', { type: 'item changed' })
 
+      // Rule R5: Preserve userInfo
+      const currentUserInfo = this._state.userInfo
+
       // Rule R2: Re-read state from localStorage
       this.loadState()
-      const previousEmail = this._state.capturedEmail
 
+      // Rule R5: Restore userInfo
+      if (currentUserInfo) {
+        this._state.userInfo = currentUserInfo
+      }
+
+      const previousEmail = this._state.capturedEmail
       const item = this.Office.context.mailbox.item
 
       if (previousEmail) {
         let shouldNotify = false
+
         if (!item) {
+          // No item selected
           shouldNotify = true
         } else if (!item.itemId) {
+          // Rule R1: Compose mode
           shouldNotify = true
+          this.event('ComposeMode', { status: 'composing new email, deselecting previous' })
         } else {
+          // Different item selected
           const currentId = this._getGraphId(item.itemId)
           if (currentId !== previousEmail.graphMessageId) {
             shouldNotify = true
           }
         }
+
         if (shouldNotify) {
           // Rule R2: Re-read before notify to prevent double-notify
           this.loadState()
+          // Rule R5: Restore userInfo again
+          if (currentUserInfo) {
+            this._state.userInfo = currentUserInfo
+          }
+
           if (this._state.capturedEmail &&
             this._state.capturedEmail.graphMessageId === previousEmail.graphMessageId) {
             try {
               await this.notify(previousEmail)
             } catch (e) {
               console.error('notify error during item change', e)
+              this._updateUI()
             }
             this._state.capturedEmail = null
             this._currentItemId = null
@@ -337,18 +382,22 @@ function aladdin(Office) {
       // Process new item
       if (item) {
         if (item.itemId) {
+          // Read mode with item
           try {
             await this._captureCurrentItem(item)
           } catch (e) {
             console.error('captureCurrentItem error', e)
+            this._updateUI()
           }
           this._registerItemEvents(item)
           try {
             await this._updateFolderFromHeaders(item)
           } catch (e) {
             console.error('updateFolderFromHeaders error', e)
+            this._updateUI()
           }
         } else {
+          // Rule R1: Compose mode
           this.event('ComposeMode', { status: 'composing new email' })
         }
       } else {
@@ -649,7 +698,6 @@ function aladdin(Office) {
       const folderNameEl = document.getElementById('folderName')
       const platformEl = document.getElementById('platform')
       const versionEl = document.getElementById('version')
-      const eventsEl = document.getElementById('events')
 
       const info = this._state.userInfo
 
@@ -668,26 +716,6 @@ function aladdin(Office) {
       }
       if (versionEl) {
         versionEl.textContent = (info && info.version) ? info.version : 'Unknown'
-      }
-
-      if (eventsEl) {
-        if (!this._state.events || this._state.events.length === 0) {
-          eventsEl.innerHTML = '<div class="no-events">No events recorded yet</div>'
-        } else {
-          let html = ''
-          const events = this._state.events.slice().reverse()
-          events.forEach(function(evt) {
-            const details = evt.details ? JSON.stringify(evt.details, null, 2) : ''
-            html += '<div class="event-item">'
-            html += '<div class="event-name">' + evt.name + '</div>'
-            html += '<div class="event-timestamp">' + evt.timestamp + '</div>'
-            if (details) {
-              html += '<div class="event-details">' + details + '</div>'
-            }
-            html += '</div>'
-          })
-          eventsEl.innerHTML = html
-        }
       }
     }
   }
