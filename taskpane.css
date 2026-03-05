@@ -84,6 +84,57 @@ body {
     margin-bottom: 8px;
     padding: 4px 0;
     word-break: break-word;
+    position: relative;
+}
+
+.field-value-container {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.field-value-container:hover .copy-btn {
+    opacity: 1;
+}
+
+.field-value {
+    display: inline;
+}
+
+.copy-btn {
+    opacity: 0;
+    background: #667eea;
+    color: white;
+    border: none;
+    padding: 4px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+    font-size: 12px;
+    line-height: 1;
+}
+
+.copy-btn:hover {
+    background: #5568d3;
+    transform: scale(1.05);
+}
+
+.copy-btn:active {
+    transform: scale(0.95);
+}
+
+.copy-btn.copied {
+    background: #10b981;
+    opacity: 1;
+}
+
+.copy-btn svg {
+    display: block;
 }
 
 .contact-field a {
@@ -157,5 +208,9 @@ body {
 
     .contact-name {
         font-size: 18px;
+    }
+
+    .copy-btn {
+        opacity: 1;
     }
 }

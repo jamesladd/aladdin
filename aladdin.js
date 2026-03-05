@@ -232,6 +232,9 @@ function aladdin(Office) {
       this.saveState()
       this._updateUI()
     },
+    copyToClipboard(text, buttonElement) {
+      this._copyToClipboard(text, buttonElement)
+    },
 
     // Private methods
 
@@ -742,6 +745,91 @@ function aladdin(Office) {
         return false
       }
     },
+    _copyToClipboard(text, buttonElement) {
+      if (!text) return
+
+      // Modern clipboard API
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          this._showCopyFeedback(buttonElement)
+        }).catch((err) => {
+          console.error('Clipboard copy failed', err)
+          this._fallbackCopy(text, buttonElement)
+        })
+      } else {
+        this._fallbackCopy(text, buttonElement)
+      }
+    },
+    _fallbackCopy(text, buttonElement) {
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea')
+      textArea.value = text
+      textArea.style.position = 'fixed'
+      textArea.style.left = '-9999px'
+      document.body.appendChild(textArea)
+      textArea.select()
+
+      try {
+        document.execCommand('copy')
+        this._showCopyFeedback(buttonElement)
+      } catch (err) {
+        console.error('Fallback copy failed', err)
+      }
+
+      document.body.removeChild(textArea)
+    },
+    _showCopyFeedback(buttonElement) {
+      if (!buttonElement) return
+
+      const originalHTML = buttonElement.innerHTML
+      buttonElement.innerHTML = '✓'
+      buttonElement.classList.add('copied')
+
+      setTimeout(() => {
+        buttonElement.innerHTML = originalHTML
+        buttonElement.classList.remove('copied')
+      }, 1500)
+    },
+    _createCopyableField(label, value, isUrl) {
+      if (!value) return ''
+
+      const uniqueId = 'copy_' + Math.random().toString(36).substr(2, 9)
+      let html = '<div class="contact-field">'
+      html += '<span class="field-label">' + this._escapeHtml(label) + ':</span> '
+      html += '<span class="field-value-container">'
+
+      if (isUrl && this._isUrl(value)) {
+        html += '<a href="' + this._escapeHtml(value) + '" target="_blank" rel="noopener noreferrer">' +
+          this._escapeHtml(value) + '</a>'
+      } else {
+        html += '<span class="field-value">' + this._escapeHtml(value) + '</span>'
+      }
+
+      html += '<button class="copy-btn" data-copy-id="' + uniqueId + '" data-copy-value="' +
+        this._escapeHtml(value) + '" title="Copy to clipboard">'
+      html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">'
+      html += '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>'
+      html += '<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>'
+      html += '</svg>'
+      html += '</button>'
+      html += '</span>'
+      html += '</div>'
+
+      return html
+    },
+    _attachCopyListeners() {
+      if (typeof document === 'undefined') return
+
+      const copyButtons = document.querySelectorAll('.copy-btn')
+      copyButtons.forEach((btn) => {
+        btn.onclick = (e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          const value = btn.getAttribute('data-copy-value')
+          this.copyToClipboard(value, btn)
+        }
+      })
+    },
     _updateUI() {
       if (typeof document === 'undefined') return
 
@@ -785,112 +873,63 @@ function aladdin(Office) {
             html += '<div class="vip-badge">VIP</div>'
           }
 
-          html += '<div class="contact-field"><span class="field-label">Job Title:</span> ' +
-            this._escapeHtml(contact.JobTitle || '') + '</div>'
-          html += '<div class="contact-field"><span class="field-label">Company:</span> ' +
-            this._escapeHtml(contact.Company || '') + '</div>'
-          html += '<div class="contact-field"><span class="field-label">Mobile:</span> ' +
-            this._escapeHtml(contact.Mobile || '') + '</div>'
-          html += '<div class="contact-field"><span class="field-label">Account No:</span> ' +
-            this._escapeHtml(contact.AccountNo || '') + '</div>'
+          html += this._createCopyableField('Job Title', contact.JobTitle, false)
+          html += this._createCopyableField('Company', contact.Company, false)
+          html += this._createCopyableField('Mobile', contact.Mobile, false)
+          html += this._createCopyableField('Account No', contact.AccountNo, false)
 
           // More/Less toggle
           if (this._state.showMoreContact) {
             html += '<div class="contact-more">'
-            html += '<div class="contact-field"><span class="field-label">UID:</span> ' +
-              this._escapeHtml(contact.UID || '') + '</div>'
-            html += '<div class="contact-field"><span class="field-label">Email:</span> ' +
-              this._escapeHtml(contact.EmailAddress || '') + '</div>'
-            html += '<div class="contact-field"><span class="field-label">Email Alias:</span> ' +
-              this._escapeHtml(contact.EmailNameAlias || '') + '</div>'
-            html += '<div class="contact-field"><span class="field-label">Street1:</span> ' +
-              this._escapeHtml(contact.Street1 || '') + '</div>'
-            html += '<div class="contact-field"><span class="field-label">Street2:</span> ' +
-              this._escapeHtml(contact.Street2 || '') + '</div>'
-            html += '<div class="contact-field"><span class="field-label">City:</span> ' +
-              this._escapeHtml(contact.City || '') + '</div>'
-            html += '<div class="contact-field"><span class="field-label">PostCode:</span> ' +
-              this._escapeHtml(contact.PostCode || '') + '</div>'
+            html += this._createCopyableField('UID', contact.UID, false)
+            html += this._createCopyableField('Email', contact.EmailAddress, false)
+            html += this._createCopyableField('Email Alias', contact.EmailNameAlias, false)
+            html += this._createCopyableField('Street1', contact.Street1, false)
+            html += this._createCopyableField('Street2', contact.Street2, false)
+            html += this._createCopyableField('City', contact.City, false)
+            html += this._createCopyableField('PostCode', contact.PostCode, false)
 
-            // Social media fields with URL links
             if (contact.Linkedin) {
-              html += '<div class="contact-field"><span class="field-label">LinkedIn:</span> '
-              if (this._isUrl(contact.Linkedin)) {
-                html += '<a href="' + this._escapeHtml(contact.Linkedin) + '" target="_blank" rel="noopener noreferrer">' +
-                  this._escapeHtml(contact.Linkedin) + '</a>'
-              } else {
-                html += this._escapeHtml(contact.Linkedin)
-              }
-              html += '</div>'
+              html += this._createCopyableField('LinkedIn', contact.Linkedin, true)
             }
             if (contact.X) {
-              html += '<div class="contact-field"><span class="field-label">X:</span> '
-              if (this._isUrl(contact.X)) {
-                html += '<a href="' + this._escapeHtml(contact.X) + '" target="_blank" rel="noopener noreferrer">' +
-                  this._escapeHtml(contact.X) + '</a>'
-              } else {
-                html += this._escapeHtml(contact.X)
-              }
-              html += '</div>'
+              html += this._createCopyableField('X', contact.X, true)
             }
             if (contact.Facebook) {
-              html += '<div class="contact-field"><span class="field-label">Facebook:</span> '
-              if (this._isUrl(contact.Facebook)) {
-                html += '<a href="' + this._escapeHtml(contact.Facebook) + '" target="_blank" rel="noopener noreferrer">' +
-                  this._escapeHtml(contact.Facebook) + '</a>'
-              } else {
-                html += this._escapeHtml(contact.Facebook)
-              }
-              html += '</div>'
+              html += this._createCopyableField('Facebook', contact.Facebook, true)
             }
             if (contact.Instagram) {
-              html += '<div class="contact-field"><span class="field-label">Instagram:</span> '
-              if (this._isUrl(contact.Instagram)) {
-                html += '<a href="' + this._escapeHtml(contact.Instagram) + '" target="_blank" rel="noopener noreferrer">' +
-                  this._escapeHtml(contact.Instagram) + '</a>'
-              } else {
-                html += this._escapeHtml(contact.Instagram)
-              }
-              html += '</div>'
+              html += this._createCopyableField('Instagram', contact.Instagram, true)
             }
 
             if (contact.OtherChan1) {
-              html += '<div class="contact-field"><span class="field-label">Other Channel 1:</span> ' +
-                this._escapeHtml(contact.OtherChan1) + '</div>'
+              html += this._createCopyableField('Other Channel 1', contact.OtherChan1, false)
             }
             if (contact.OtherChan2) {
-              html += '<div class="contact-field"><span class="field-label">Other Channel 2:</span> ' +
-                this._escapeHtml(contact.OtherChan2) + '</div>'
+              html += this._createCopyableField('Other Channel 2', contact.OtherChan2, false)
             }
             if (contact.SubscriberAttr1) {
-              html += '<div class="contact-field"><span class="field-label">Subscriber Attr 1:</span> ' +
-                this._escapeHtml(contact.SubscriberAttr1) + '</div>'
+              html += this._createCopyableField('Subscriber Attr 1', contact.SubscriberAttr1, false)
             }
             if (contact.SubscriberAttr2) {
-              html += '<div class="contact-field"><span class="field-label">Subscriber Attr 2:</span> ' +
-                this._escapeHtml(contact.SubscriberAttr2) + '</div>'
+              html += this._createCopyableField('Subscriber Attr 2', contact.SubscriberAttr2, false)
             }
             if (contact.SubscriberAttr3) {
-              html += '<div class="contact-field"><span class="field-label">Subscriber Attr 3:</span> ' +
-                this._escapeHtml(contact.SubscriberAttr3) + '</div>'
+              html += this._createCopyableField('Subscriber Attr 3', contact.SubscriberAttr3, false)
             }
             if (contact.SubscriberAttr4) {
-              html += '<div class="contact-field"><span class="field-label">Subscriber Attr 4:</span> ' +
-                this._escapeHtml(contact.SubscriberAttr4) + '</div>'
+              html += this._createCopyableField('Subscriber Attr 4', contact.SubscriberAttr4, false)
             }
 
             // Timestamp fields
             if (contact.CreatedAt) {
-              html += '<div class="contact-field"><span class="field-label">Created:</span> ' +
-                this._escapeHtml(this._formatTimestamp(contact.CreatedAt)) + '</div>'
+              html += this._createCopyableField('Created', this._formatTimestamp(contact.CreatedAt), false)
             }
             if (contact.UpdatedAt) {
-              html += '<div class="contact-field"><span class="field-label">Updated:</span> ' +
-                this._escapeHtml(this._formatTimestamp(contact.UpdatedAt)) + '</div>'
+              html += this._createCopyableField('Updated', this._formatTimestamp(contact.UpdatedAt), false)
             }
             if (contact.LastContactedAt) {
-              html += '<div class="contact-field"><span class="field-label">Last Contacted:</span> ' +
-                this._escapeHtml(this._formatTimestamp(contact.LastContactedAt)) + '</div>'
+              html += this._createCopyableField('Last Contacted', this._formatTimestamp(contact.LastContactedAt), false)
             }
             html += '</div>'
             html += '<button id="toggleContactBtn" class="toggle-btn">Less</button>'
@@ -901,13 +940,16 @@ function aladdin(Office) {
           html += '</div>'
           contactSectionEl.innerHTML = html
 
-          // Attach event listener
+          // Attach event listeners
           const toggleBtn = document.getElementById('toggleContactBtn')
           if (toggleBtn) {
             toggleBtn.onclick = () => {
               this.toggleMoreContact()
             }
           }
+
+          // Attach copy button listeners
+          this._attachCopyListeners()
         } else {
           contactSectionEl.innerHTML = '<div class="no-contact">No contact information available</div>'
         }
