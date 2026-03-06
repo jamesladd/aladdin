@@ -151,6 +151,21 @@ body {
     font-style: italic;
 }
 
+.conversation-summary-container {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+}
+
+.no-conversation-summary {
+    text-align: center;
+    color: #999;
+    padding: 40px 20px;
+    font-style: italic;
+}
+
 .actions-container {
     background: white;
     padding: 20px;
@@ -228,6 +243,10 @@ body {
 
     .contact-name {
         font-size: 18px;
+    }
+
+    .conversation-summary-container {
+        padding: 15px;
     }
 
     .actions-container {
