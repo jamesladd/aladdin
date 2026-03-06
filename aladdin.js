@@ -767,6 +767,7 @@ function aladdin(Office) {
       const platformEl = document.getElementById('platform')
       const versionEl = document.getElementById('version')
       const contactSectionEl = document.getElementById('contactSection')
+      const sectionTitleEl = document.querySelector('.section-title-container')
 
       const info = this._state.userInfo
 
@@ -785,6 +786,22 @@ function aladdin(Office) {
       }
       if (versionEl) {
         versionEl.textContent = (info && info.version) ? info.version : 'Unknown'
+      }
+
+      // Update section title with chevron toggle
+      if (sectionTitleEl) {
+        const contact = this._state.contactInfo
+        if (contact) {
+          const chevronClass = this._state.showMoreContact ? 'chevron-up' : 'chevron-down'
+          sectionTitleEl.innerHTML = '<span class="section-title">Contact</span>' +
+            '<button id="toggleChevronBtn" class="chevron-btn ' + chevronClass + '" title="Toggle contact details">' +
+            '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+            '<polyline points="6 9 12 15 18 9"></polyline>' +
+            '</svg>' +
+            '</button>'
+        } else {
+          sectionTitleEl.innerHTML = '<span class="section-title">Contact</span>'
+        }
       }
 
       // Update contact section
@@ -862,8 +879,6 @@ function aladdin(Office) {
             }
             html += '</div>'
             html += '<button id="toggleContactBtn" class="toggle-btn">Less</button>'
-          } else {
-            html += '<button id="toggleContactBtn" class="toggle-btn">More</button>'
           }
 
           html += '</div>'
@@ -873,6 +888,13 @@ function aladdin(Office) {
           const toggleBtn = document.getElementById('toggleContactBtn')
           if (toggleBtn) {
             toggleBtn.onclick = () => {
+              this.toggleMoreContact()
+            }
+          }
+
+          const chevronBtn = document.getElementById('toggleChevronBtn')
+          if (chevronBtn) {
+            chevronBtn.onclick = () => {
               this.toggleMoreContact()
             }
           }
