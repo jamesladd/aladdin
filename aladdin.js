@@ -767,6 +767,7 @@ function aladdin(Office) {
       const platformEl = document.getElementById('platform')
       const versionEl = document.getElementById('version')
       const contactSectionEl = document.getElementById('contactSection')
+      const actionsSectionEl = document.getElementById('actionsSection')
       const sectionTitleEl = document.querySelector('.section-title-container')
 
       const info = this._state.userInfo
@@ -901,6 +902,11 @@ function aladdin(Office) {
         } else {
           contactSectionEl.innerHTML = '<div class="no-contact">No contact information available</div>'
         }
+      }
+
+      // Update actions section
+      if (actionsSectionEl) {
+        actionsSectionEl.innerHTML = '<div class="no-actions">No actions available</div>'
       }
     },
     _escapeHtml(text) {
