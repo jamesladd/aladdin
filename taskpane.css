@@ -179,17 +179,33 @@ body {
     font-weight: 600;
     color: #333;
     margin-bottom: 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .info-row {
     font-size: 14px;
     color: #555;
     margin-top: 6px;
+    display: flex;
+    align-items: baseline;
+    min-width: 0;
 }
 
 .info-label {
     font-weight: 600;
     color: #667eea;
+    flex-shrink: 0;
+    margin-right: 4px;
+}
+
+.info-value {
+    color: #555;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
 }
 
 /* Responsive adjustments */
