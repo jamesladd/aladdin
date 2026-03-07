@@ -985,12 +985,11 @@ function aladdin(Office) {
             // Always show all fields in edit mode
             html += '<div class="contact-more">'
             html += this._createContactFieldEdit('UID', 'UID', editedContact.UID, true)
-            html += this._createContactFieldEdit('EmailAddress', 'Email Address', editedContact.EmailAddress, false)
-            html += this._createContactFieldEdit('EmailNameAlias', 'Email Alias', editedContact.EmailNameAlias, false)
             html += this._createContactFieldEdit('Street1', 'Street1', editedContact.Street1, false)
             html += this._createContactFieldEdit('Street2', 'Street2', editedContact.Street2, false)
             html += this._createContactFieldEdit('City', 'City', editedContact.City, false)
             html += this._createContactFieldEdit('PostCode', 'PostCode', editedContact.PostCode, false)
+            html += this._createContactFieldEdit('EmailNameAlias', 'Email Alias', editedContact.EmailNameAlias, false)
             html += this._createContactFieldEdit('Linkedin', 'LinkedIn', editedContact.Linkedin, false)
             html += this._createContactFieldEdit('X', 'X', editedContact.X, false)
             html += this._createContactFieldEdit('Facebook', 'Facebook', editedContact.Facebook, false)
@@ -1033,7 +1032,7 @@ function aladdin(Office) {
             // Attach input change listeners
             const editableFields = [
               'Firstname', 'Surname', 'JobTitle', 'Company', 'Mobile', 'AccountNo',
-              'EmailAddress', 'EmailNameAlias', 'Street1', 'Street2', 'City', 'PostCode',
+              'Street1', 'Street2', 'City', 'PostCode', 'EmailNameAlias',
               'Linkedin', 'X', 'Facebook', 'Instagram', 'OtherChan1', 'OtherChan2',
               'SubscriberAttr1', 'SubscriberAttr2', 'SubscriberAttr3', 'SubscriberAttr4'
             ]
@@ -1078,18 +1077,18 @@ function aladdin(Office) {
             html += this._createContactField('Job Title', contact.JobTitle, false)
             html += this._createContactField('Company', contact.Company, false)
             html += this._createContactField('Mobile', contact.Mobile, false)
+            html += this._createContactField('Email', contact.EmailAddress, false)
             html += this._createContactField('Account No', contact.AccountNo, false)
 
             // More/Less toggle
             if (this._state.showMoreContact) {
               html += '<div class="contact-more">'
               html += this._createContactField('UID', contact.UID, false)
-              html += this._createContactField('Email Address', contact.EmailAddress, false)
-              html += this._createContactField('Email Alias', contact.EmailNameAlias, false)
               html += this._createContactField('Street1', contact.Street1, false)
               html += this._createContactField('Street2', contact.Street2, false)
               html += this._createContactField('City', contact.City, false)
               html += this._createContactField('PostCode', contact.PostCode, false)
+              html += this._createContactField('Email Alias', contact.EmailNameAlias, false)
 
               if (contact.Linkedin) {
                 html += this._createContactField('LinkedIn', contact.Linkedin, true)
