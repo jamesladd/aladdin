@@ -287,6 +287,11 @@ function aladdin(Office) {
       this._state.editedContact[fieldName] = value
       this.saveState()
     },
+    updateEditedContactVIPStatus(checked) {
+      if (!this._state.editedContact) return
+      this._state.editedContact.VIPStatus = checked
+      this.saveState()
+    },
     async saveEditedContact() {
       if (!this._state.editedContact) return
 
@@ -964,9 +969,13 @@ function aladdin(Office) {
             html += '</div>'
             html += '</div>'
 
-            if (editedContact.VIPStatus) {
-              html += '<div class="vip-badge">VIP</div>'
-            }
+            // VIP Status checkbox
+            html += '<div class="contact-field-edit vip-field">'
+            html += '<label class="vip-checkbox-label">'
+            html += '<input type="checkbox" id="edit_VIPStatus"' + (editedContact.VIPStatus ? ' checked' : '') + '>'
+            html += '<span class="vip-checkbox-text">VIP Status</span>'
+            html += '</label>'
+            html += '</div>'
 
             html += this._createContactFieldEdit('JobTitle', 'Job Title', editedContact.JobTitle, false)
             html += this._createContactFieldEdit('Company', 'Company', editedContact.Company, false)
@@ -976,7 +985,7 @@ function aladdin(Office) {
             // Always show all fields in edit mode
             html += '<div class="contact-more">'
             html += this._createContactFieldEdit('UID', 'UID', editedContact.UID, true)
-            html += this._createContactFieldEdit('EmailAddress', 'Email', editedContact.EmailAddress, false)
+            html += this._createContactFieldEdit('EmailAddress', 'Email Address', editedContact.EmailAddress, false)
             html += this._createContactFieldEdit('EmailNameAlias', 'Email Alias', editedContact.EmailNameAlias, false)
             html += this._createContactFieldEdit('Street1', 'Street1', editedContact.Street1, false)
             html += this._createContactFieldEdit('Street2', 'Street2', editedContact.Street2, false)
@@ -1012,6 +1021,14 @@ function aladdin(Office) {
             html += '</div>'
 
             contactSectionEl.innerHTML = html
+
+            // Attach VIP checkbox listener
+            const vipCheckbox = document.getElementById('edit_VIPStatus')
+            if (vipCheckbox) {
+              vipCheckbox.addEventListener('change', (e) => {
+                this.updateEditedContactVIPStatus(e.target.checked)
+              })
+            }
 
             // Attach input change listeners
             const editableFields = [
@@ -1067,7 +1084,7 @@ function aladdin(Office) {
             if (this._state.showMoreContact) {
               html += '<div class="contact-more">'
               html += this._createContactField('UID', contact.UID, false)
-              html += this._createContactField('Email', contact.EmailAddress, false)
+              html += this._createContactField('Email Address', contact.EmailAddress, false)
               html += this._createContactField('Email Alias', contact.EmailNameAlias, false)
               html += this._createContactField('Street1', contact.Street1, false)
               html += this._createContactField('Street2', contact.Street2, false)
