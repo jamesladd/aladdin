@@ -22,7 +22,9 @@ function aladdin(Office) {
       contactInfo: null,
       userInfo: null,
       _lastCategoryInit: null,
-      showMoreContact: false
+      showMoreContact: false,
+      isEditingContact: false,
+      editedContact: null
     },
     state() {
       return this._state
@@ -227,10 +229,78 @@ function aladdin(Office) {
       }
       return null
     },
+    async saveContact(contactData) {
+      if (!contactData) return false
+      this.event('SaveContact', { uid: contactData.UID })
+      try {
+        const response = await fetch('https://www.devappeggio.com/api/inboxcontact/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(contactData)
+        })
+        if (response.ok) {
+          return true
+        }
+      } catch (e) {
+        console.error('saveContact API error', e)
+      }
+      return false
+    },
     toggleMoreContact() {
       this._state.showMoreContact = !this._state.showMoreContact
       this.saveState()
       this._updateUI()
+    },
+    startEditingContact() {
+      if (!this._state.contactInfo) return
+      this._state.isEditingContact = true
+      this._state.editedContact = JSON.parse(JSON.stringify(this._state.contactInfo))
+      this.saveState()
+      this._updateUI()
+    },
+    cancelEditingContact() {
+      this._state.isEditingContact = false
+      this._state.editedContact = null
+      this.saveState()
+      this._updateUI()
+    },
+    updateEditedContactField(fieldName, value) {
+      if (!this._state.editedContact) return
+      this._state.editedContact[fieldName] = value
+      this.saveState()
+    },
+    async saveEditedContact() {
+      if (!this._state.editedContact) return
+
+      const saveBtn = document.getElementById('saveContactBtn')
+      if (saveBtn) {
+        saveBtn.disabled = true
+        saveBtn.textContent = 'Saving...'
+      }
+
+      try {
+        const success = await this.saveContact(this._state.editedContact)
+        if (success) {
+          this._state.contactInfo = this._state.editedContact
+          this._state.isEditingContact = false
+          this._state.editedContact = null
+          this.saveState()
+          this._updateUI()
+        } else {
+          if (saveBtn) {
+            saveBtn.disabled = false
+            saveBtn.textContent = 'Save Changes'
+          }
+          alert('Failed to save contact. Please try again.')
+        }
+      } catch (e) {
+        console.error('saveEditedContact error', e)
+        if (saveBtn) {
+          saveBtn.disabled = false
+          saveBtn.textContent = 'Save Changes'
+        }
+        alert('Error saving contact. Please try again.')
+      }
     },
 
     // Private methods
@@ -759,6 +829,17 @@ function aladdin(Office) {
 
       return html
     },
+    _createContactFieldEdit(fieldName, label, value, disabled) {
+      const val = value || ''
+      const dis = disabled ? ' disabled' : ''
+
+      let html = '<div class="contact-field-edit">'
+      html += '<span class="field-label">' + this._escapeHtml(label) + ':</span>'
+      html += '<input type="text" id="edit_' + fieldName + '" value="' + this._escapeHtml(val) + '"' + dis + '>'
+      html += '</div>'
+
+      return html
+    },
     _updateUI() {
       if (typeof document === 'undefined') return
 
@@ -769,7 +850,7 @@ function aladdin(Office) {
       const contactSectionEl = document.getElementById('contactSection')
       const conversationSummarySectionEl = document.getElementById('conversationSummarySection')
       const actionsSectionEl = document.getElementById('actionsSection')
-      const sectionTitleEl = document.querySelector('.section-title-container')
+      const sectionTitleEls = document.querySelectorAll('.section-title-container')
 
       const info = this._state.userInfo
 
@@ -790,114 +871,218 @@ function aladdin(Office) {
         versionEl.textContent = (info && info.version) ? info.version : 'Unknown'
       }
 
-      // Update section title with chevron toggle
-      if (sectionTitleEl) {
+      // Update Contact section title with edit and chevron buttons
+      if (sectionTitleEls.length > 0) {
+        const contactTitleEl = sectionTitleEls[0]
         const contact = this._state.contactInfo
         if (contact) {
           const chevronClass = this._state.showMoreContact ? 'chevron-up' : 'chevron-down'
-          sectionTitleEl.innerHTML = '<span class="section-title">Contact</span>' +
+          contactTitleEl.innerHTML = '<span class="section-title">Contact</span>' +
+            '<div class="section-title-buttons">' +
+            '<button id="editContactBtn" class="edit-btn" title="Edit contact">' +
+            '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+            '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>' +
+            '<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>' +
+            '</svg>' +
+            '</button>' +
             '<button id="toggleChevronBtn" class="chevron-btn ' + chevronClass + '" title="Toggle contact details">' +
             '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
             '<polyline points="6 9 12 15 18 9"></polyline>' +
             '</svg>' +
-            '</button>'
+            '</button>' +
+            '</div>'
         } else {
-          sectionTitleEl.innerHTML = '<span class="section-title">Contact</span>'
+          contactTitleEl.innerHTML = '<span class="section-title">Contact</span>'
         }
       }
 
       // Update contact section
       if (contactSectionEl) {
         const contact = this._state.contactInfo
+        const isEditing = this._state.isEditingContact
+        const editedContact = this._state.editedContact
+
         if (contact) {
-          let html = '<div class="contact-card">'
+          if (isEditing && editedContact) {
+            // Edit mode
+            let html = '<div class="contact-card">'
 
-          // Primary fields
-          html += '<div class="contact-name">' +
-            this._escapeHtml(contact.Firstname || '') + ' ' +
-            this._escapeHtml(contact.Surname || '') + '</div>'
+            // Name fields
+            html += '<div class="contact-name-edit">'
+            html += '<input type="text" id="edit_Firstname" placeholder="First Name" value="' +
+              this._escapeHtml(editedContact.Firstname || '') + '">'
+            html += '<input type="text" id="edit_Surname" placeholder="Surname" value="' +
+              this._escapeHtml(editedContact.Surname || '') + '">'
+            html += '</div>'
 
-          if (contact.VIPStatus) {
-            html += '<div class="vip-badge">VIP</div>'
-          }
+            if (editedContact.VIPStatus) {
+              html += '<div class="vip-badge">VIP</div>'
+            }
 
-          html += this._createContactField('Job Title', contact.JobTitle, false)
-          html += this._createContactField('Company', contact.Company, false)
-          html += this._createContactField('Mobile', contact.Mobile, false)
-          html += this._createContactField('Account No', contact.AccountNo, false)
+            html += this._createContactFieldEdit('JobTitle', 'Job Title', editedContact.JobTitle, false)
+            html += this._createContactFieldEdit('Company', 'Company', editedContact.Company, false)
+            html += this._createContactFieldEdit('Mobile', 'Mobile', editedContact.Mobile, false)
+            html += this._createContactFieldEdit('AccountNo', 'Account No', editedContact.AccountNo, false)
 
-          // More/Less toggle
-          if (this._state.showMoreContact) {
+            // Always show all fields in edit mode
             html += '<div class="contact-more">'
-            html += this._createContactField('UID', contact.UID, false)
-            html += this._createContactField('Email', contact.EmailAddress, false)
-            html += this._createContactField('Email Alias', contact.EmailNameAlias, false)
-            html += this._createContactField('Street1', contact.Street1, false)
-            html += this._createContactField('Street2', contact.Street2, false)
-            html += this._createContactField('City', contact.City, false)
-            html += this._createContactField('PostCode', contact.PostCode, false)
+            html += this._createContactFieldEdit('UID', 'UID', editedContact.UID, true)
+            html += this._createContactFieldEdit('EmailAddress', 'Email', editedContact.EmailAddress, false)
+            html += this._createContactFieldEdit('EmailNameAlias', 'Email Alias', editedContact.EmailNameAlias, false)
+            html += this._createContactFieldEdit('Street1', 'Street1', editedContact.Street1, false)
+            html += this._createContactFieldEdit('Street2', 'Street2', editedContact.Street2, false)
+            html += this._createContactFieldEdit('City', 'City', editedContact.City, false)
+            html += this._createContactFieldEdit('PostCode', 'PostCode', editedContact.PostCode, false)
+            html += this._createContactFieldEdit('Linkedin', 'LinkedIn', editedContact.Linkedin, false)
+            html += this._createContactFieldEdit('X', 'X', editedContact.X, false)
+            html += this._createContactFieldEdit('Facebook', 'Facebook', editedContact.Facebook, false)
+            html += this._createContactFieldEdit('Instagram', 'Instagram', editedContact.Instagram, false)
+            html += this._createContactFieldEdit('OtherChan1', 'Other Channel 1', editedContact.OtherChan1, false)
+            html += this._createContactFieldEdit('OtherChan2', 'Other Channel 2', editedContact.OtherChan2, false)
+            html += this._createContactFieldEdit('SubscriberAttr1', 'Subscriber Attr 1', editedContact.SubscriberAttr1, false)
+            html += this._createContactFieldEdit('SubscriberAttr2', 'Subscriber Attr 2', editedContact.SubscriberAttr2, false)
+            html += this._createContactFieldEdit('SubscriberAttr3', 'Subscriber Attr 3', editedContact.SubscriberAttr3, false)
+            html += this._createContactFieldEdit('SubscriberAttr4', 'Subscriber Attr 4', editedContact.SubscriberAttr4, false)
 
-            if (contact.Linkedin) {
-              html += this._createContactField('LinkedIn', contact.Linkedin, true)
+            // Timestamp fields (read-only)
+            if (editedContact.CreatedAt) {
+              html += this._createContactField('Created', this._formatTimestamp(editedContact.CreatedAt), false)
             }
-            if (contact.X) {
-              html += this._createContactField('X', contact.X, true)
+            if (editedContact.UpdatedAt) {
+              html += this._createContactField('Updated', this._formatTimestamp(editedContact.UpdatedAt), false)
             }
-            if (contact.Facebook) {
-              html += this._createContactField('Facebook', contact.Facebook, true)
-            }
-            if (contact.Instagram) {
-              html += this._createContactField('Instagram', contact.Instagram, true)
-            }
-
-            if (contact.OtherChan1) {
-              html += this._createContactField('Other Channel 1', contact.OtherChan1, false)
-            }
-            if (contact.OtherChan2) {
-              html += this._createContactField('Other Channel 2', contact.OtherChan2, false)
-            }
-            if (contact.SubscriberAttr1) {
-              html += this._createContactField('Subscriber Attr 1', contact.SubscriberAttr1, false)
-            }
-            if (contact.SubscriberAttr2) {
-              html += this._createContactField('Subscriber Attr 2', contact.SubscriberAttr2, false)
-            }
-            if (contact.SubscriberAttr3) {
-              html += this._createContactField('Subscriber Attr 3', contact.SubscriberAttr3, false)
-            }
-            if (contact.SubscriberAttr4) {
-              html += this._createContactField('Subscriber Attr 4', contact.SubscriberAttr4, false)
-            }
-
-            // Timestamp fields
-            if (contact.CreatedAt) {
-              html += this._createContactField('Created', this._formatTimestamp(contact.CreatedAt), false)
-            }
-            if (contact.UpdatedAt) {
-              html += this._createContactField('Updated', this._formatTimestamp(contact.UpdatedAt), false)
-            }
-            if (contact.LastContactedAt) {
-              html += this._createContactField('Last Contacted', this._formatTimestamp(contact.LastContactedAt), false)
+            if (editedContact.LastContactedAt) {
+              html += this._createContactField('Last Contacted', this._formatTimestamp(editedContact.LastContactedAt), false)
             }
             html += '</div>'
-            html += '<button id="toggleContactBtn" class="toggle-btn">Less</button>'
-          }
 
-          html += '</div>'
-          contactSectionEl.innerHTML = html
+            html += '<button id="saveContactBtn" class="save-btn">Save Changes</button>'
+            html += '</div>'
 
-          // Attach event listeners
-          const toggleBtn = document.getElementById('toggleContactBtn')
-          if (toggleBtn) {
-            toggleBtn.onclick = () => {
-              this.toggleMoreContact()
+            contactSectionEl.innerHTML = html
+
+            // Attach input change listeners
+            const editableFields = [
+              'Firstname', 'Surname', 'JobTitle', 'Company', 'Mobile', 'AccountNo',
+              'EmailAddress', 'EmailNameAlias', 'Street1', 'Street2', 'City', 'PostCode',
+              'Linkedin', 'X', 'Facebook', 'Instagram', 'OtherChan1', 'OtherChan2',
+              'SubscriberAttr1', 'SubscriberAttr2', 'SubscriberAttr3', 'SubscriberAttr4'
+            ]
+
+            editableFields.forEach((fieldName) => {
+              const input = document.getElementById('edit_' + fieldName)
+              if (input) {
+                input.addEventListener('input', (e) => {
+                  this.updateEditedContactField(fieldName, e.target.value)
+                })
+              }
+            })
+
+            // Attach save button listener
+            const saveBtn = document.getElementById('saveContactBtn')
+            if (saveBtn) {
+              saveBtn.onclick = () => {
+                this.saveEditedContact()
+              }
             }
-          }
+          } else {
+            // View mode
+            let html = '<div class="contact-card">'
 
-          const chevronBtn = document.getElementById('toggleChevronBtn')
-          if (chevronBtn) {
-            chevronBtn.onclick = () => {
-              this.toggleMoreContact()
+            // Primary fields
+            html += '<div class="contact-name">' +
+              this._escapeHtml(contact.Firstname || '') + ' ' +
+              this._escapeHtml(contact.Surname || '') + '</div>'
+
+            if (contact.VIPStatus) {
+              html += '<div class="vip-badge">VIP</div>'
+            }
+
+            html += this._createContactField('Job Title', contact.JobTitle, false)
+            html += this._createContactField('Company', contact.Company, false)
+            html += this._createContactField('Mobile', contact.Mobile, false)
+            html += this._createContactField('Account No', contact.AccountNo, false)
+
+            // More/Less toggle
+            if (this._state.showMoreContact) {
+              html += '<div class="contact-more">'
+              html += this._createContactField('UID', contact.UID, false)
+              html += this._createContactField('Email', contact.EmailAddress, false)
+              html += this._createContactField('Email Alias', contact.EmailNameAlias, false)
+              html += this._createContactField('Street1', contact.Street1, false)
+              html += this._createContactField('Street2', contact.Street2, false)
+              html += this._createContactField('City', contact.City, false)
+              html += this._createContactField('PostCode', contact.PostCode, false)
+
+              if (contact.Linkedin) {
+                html += this._createContactField('LinkedIn', contact.Linkedin, true)
+              }
+              if (contact.X) {
+                html += this._createContactField('X', contact.X, true)
+              }
+              if (contact.Facebook) {
+                html += this._createContactField('Facebook', contact.Facebook, true)
+              }
+              if (contact.Instagram) {
+                html += this._createContactField('Instagram', contact.Instagram, true)
+              }
+
+              if (contact.OtherChan1) {
+                html += this._createContactField('Other Channel 1', contact.OtherChan1, false)
+              }
+              if (contact.OtherChan2) {
+                html += this._createContactField('Other Channel 2', contact.OtherChan2, false)
+              }
+              if (contact.SubscriberAttr1) {
+                html += this._createContactField('Subscriber Attr 1', contact.SubscriberAttr1, false)
+              }
+              if (contact.SubscriberAttr2) {
+                html += this._createContactField('Subscriber Attr 2', contact.SubscriberAttr2, false)
+              }
+              if (contact.SubscriberAttr3) {
+                html += this._createContactField('Subscriber Attr 3', contact.SubscriberAttr3, false)
+              }
+              if (contact.SubscriberAttr4) {
+                html += this._createContactField('Subscriber Attr 4', contact.SubscriberAttr4, false)
+              }
+
+              // Timestamp fields
+              if (contact.CreatedAt) {
+                html += this._createContactField('Created', this._formatTimestamp(contact.CreatedAt), false)
+              }
+              if (contact.UpdatedAt) {
+                html += this._createContactField('Updated', this._formatTimestamp(contact.UpdatedAt), false)
+              }
+              if (contact.LastContactedAt) {
+                html += this._createContactField('Last Contacted', this._formatTimestamp(contact.LastContactedAt), false)
+              }
+              html += '</div>'
+              html += '<button id="toggleContactBtn" class="toggle-btn">Less</button>'
+            }
+
+            html += '</div>'
+            contactSectionEl.innerHTML = html
+
+            // Attach event listeners
+            const toggleBtn = document.getElementById('toggleContactBtn')
+            if (toggleBtn) {
+              toggleBtn.onclick = () => {
+                this.toggleMoreContact()
+              }
+            }
+
+            const editBtn = document.getElementById('editContactBtn')
+            if (editBtn) {
+              editBtn.onclick = () => {
+                this.startEditingContact()
+              }
+            }
+
+            const chevronBtn = document.getElementById('toggleChevronBtn')
+            if (chevronBtn) {
+              chevronBtn.onclick = () => {
+                this.toggleMoreContact()
+              }
             }
           }
         } else {
