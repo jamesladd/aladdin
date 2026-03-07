@@ -54,8 +54,20 @@ function aladdin(Office) {
         if (e.key === 'aladdin_state' && e.newValue) {
           try {
             const parsed = JSON.parse(e.newValue)
+
+            // Preserve current edit state to prevent race conditions
+            const currentEditState = this._state.isEditingContact
+            const currentEditedContact = this._state.editedContact
+
             this._state = parsed
             if (!this._state.events) this._state.events = []
+
+            // If we're currently in edit mode, don't let storage events override it
+            if (currentEditState) {
+              this._state.isEditingContact = currentEditState
+              this._state.editedContact = currentEditedContact
+            }
+
             this._updateUI()
           } catch (err) {
             console.error('watchState parse error', err)
@@ -238,13 +250,18 @@ function aladdin(Office) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(contactData)
         })
+
+        // Consider both 200 and 204 as success
         if (response.ok) {
           return true
         }
+
+        console.error('saveContact failed with status:', response.status)
+        return false
       } catch (e) {
         console.error('saveContact API error', e)
+        return false
       }
-      return false
     },
     toggleMoreContact() {
       this._state.showMoreContact = !this._state.showMoreContact
@@ -286,31 +303,33 @@ function aladdin(Office) {
 
       try {
         const success = await this.saveContact(this._state.editedContact)
+
+        // Update contact info if successful
         if (success) {
-          this._state.contactInfo = this._state.editedContact
-          this._state.isEditingContact = false
-          this._state.editedContact = null
-          this.saveState()
-          this._updateUI()
-        } else {
-          if (saveBtn) {
-            saveBtn.disabled = false
-            saveBtn.textContent = 'Save Changes'
-          }
-          if (cancelBtn) {
-            cancelBtn.disabled = false
-          }
-          alert('Failed to save contact. Please try again.')
+          this._state.contactInfo = JSON.parse(JSON.stringify(this._state.editedContact))
+        }
+
+        // ALWAYS exit edit mode after save attempt - do this BEFORE saveState
+        this._state.isEditingContact = false
+        this._state.editedContact = null
+
+        // Save state and update UI
+        this.saveState()
+        this._updateUI()
+
+        // Show error message if save failed
+        if (!success) {
+          alert('Failed to save contact. Changes were not persisted to the server.')
         }
       } catch (e) {
         console.error('saveEditedContact error', e)
-        if (saveBtn) {
-          saveBtn.disabled = false
-          saveBtn.textContent = 'Save Changes'
-        }
-        if (cancelBtn) {
-          cancelBtn.disabled = false
-        }
+
+        // Exit edit mode even on error
+        this._state.isEditingContact = false
+        this._state.editedContact = null
+        this.saveState()
+        this._updateUI()
+
         alert('Error saving contact. Please try again.')
       }
     },
