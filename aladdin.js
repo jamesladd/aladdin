@@ -888,6 +888,25 @@ function aladdin(Office) {
 
       return html
     },
+    _createContactFieldAlwaysShow(label, value, isUrl) {
+      let html = '<div class="contact-field">'
+      html += '<span class="field-label">' + this._escapeHtml(label) + ':</span> '
+
+      if (value) {
+        if (isUrl && this._isUrl(value)) {
+          html += '<a href="' + this._escapeHtml(value) + '" target="_blank" rel="noopener noreferrer">' +
+            this._escapeHtml(value) + '</a>'
+        } else {
+          html += '<span class="field-value">' + this._escapeHtml(value) + '</span>'
+        }
+      } else {
+        html += '<span class="field-value field-empty">-</span>'
+      }
+
+      html += '</div>'
+
+      return html
+    },
     _updateUI() {
       if (typeof document === 'undefined') return
 
@@ -981,7 +1000,7 @@ function aladdin(Office) {
             html += this._createContactFieldEdit('Company', 'Company', editedContact.Company, false)
             html += this._createContactFieldEdit('Mobile', 'Mobile', editedContact.Mobile, false)
             html += this._createContactFieldEdit('AccountNo', 'Account No', editedContact.AccountNo, false)
-            html += this._createContactFieldEdit('EmailAddress', 'Email Address', editedContact.EmailAddress, true)
+            html += this._createContactFieldEdit('EmailAddress', 'Email', editedContact.EmailAddress, false)
 
             // Always show all fields in edit mode
             html += '<div class="contact-more">'
@@ -1030,9 +1049,9 @@ function aladdin(Office) {
               })
             }
 
-            // Attach input change listeners
+            // Attach input change listeners - now includes EmailAddress
             const editableFields = [
-              'Firstname', 'Surname', 'JobTitle', 'Company', 'Mobile', 'AccountNo',
+              'Firstname', 'Surname', 'JobTitle', 'Company', 'Mobile', 'AccountNo', 'EmailAddress',
               'Street1', 'Street2', 'City', 'PostCode', 'EmailNameAlias',
               'Linkedin', 'X', 'Facebook', 'Instagram', 'OtherChan1', 'OtherChan2',
               'SubscriberAttr1', 'SubscriberAttr2', 'SubscriberAttr3', 'SubscriberAttr4'
@@ -1079,7 +1098,7 @@ function aladdin(Office) {
             html += this._createContactField('Company', contact.Company, false)
             html += this._createContactField('Mobile', contact.Mobile, false)
             html += this._createContactField('Account No', contact.AccountNo, false)
-            html += this._createContactField('Email Address', contact.EmailAddress, false)
+            html += this._createContactFieldAlwaysShow('Email', contact.EmailAddress, false)
 
             // More/Less toggle
             if (this._state.showMoreContact) {
