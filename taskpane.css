@@ -106,14 +106,26 @@ body {
 
 .contact-name-edit {
     display: flex;
-    gap: 8px;
-    margin-bottom: 10px;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.contact-name-field {
+    display: flex;
+    flex-direction: column;
+}
+
+.contact-name-field .field-label {
+    font-weight: 600;
+    color: #667eea;
+    margin-bottom: 4px;
+    font-size: 14px;
 }
 
 .contact-name-edit input {
-    flex: 1;
-    font-size: 18px;
-    font-weight: 600;
+    font-size: 16px;
+    font-weight: 500;
     padding: 8px 12px;
     border: 1px solid #ddd;
     border-radius: 4px;

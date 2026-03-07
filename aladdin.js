@@ -950,12 +950,18 @@ function aladdin(Office) {
             // Edit mode
             let html = '<div class="contact-card">'
 
-            // Name fields
+            // Name fields with labels - vertical layout
             html += '<div class="contact-name-edit">'
+            html += '<div class="contact-name-field">'
+            html += '<span class="field-label">First Name:</span>'
             html += '<input type="text" id="edit_Firstname" placeholder="First Name" value="' +
               this._escapeHtml(editedContact.Firstname || '') + '">'
+            html += '</div>'
+            html += '<div class="contact-name-field">'
+            html += '<span class="field-label">Surname:</span>'
             html += '<input type="text" id="edit_Surname" placeholder="Surname" value="' +
               this._escapeHtml(editedContact.Surname || '') + '">'
+            html += '</div>'
             html += '</div>'
 
             if (editedContact.VIPStatus) {
