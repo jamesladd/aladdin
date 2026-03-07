@@ -973,7 +973,7 @@ function aladdin(Office) {
             html += '<div class="contact-field-edit vip-field">'
             html += '<label class="vip-checkbox-label">'
             html += '<input type="checkbox" id="edit_VIPStatus"' + (editedContact.VIPStatus ? ' checked' : '') + '>'
-            html += '<span class="vip-checkbox-text">VIP Status</span>'
+            html += '<span class="vip-checkbox-text">&nbsp;&nbsp;VIP Status</span>'
             html += '</label>'
             html += '</div>'
 
@@ -981,6 +981,7 @@ function aladdin(Office) {
             html += this._createContactFieldEdit('Company', 'Company', editedContact.Company, false)
             html += this._createContactFieldEdit('Mobile', 'Mobile', editedContact.Mobile, false)
             html += this._createContactFieldEdit('AccountNo', 'Account No', editedContact.AccountNo, false)
+            html += this._createContactFieldEdit('EmailAddress', 'Email Address', editedContact.EmailAddress, true)
 
             // Always show all fields in edit mode
             html += '<div class="contact-more">'
@@ -1077,8 +1078,8 @@ function aladdin(Office) {
             html += this._createContactField('Job Title', contact.JobTitle, false)
             html += this._createContactField('Company', contact.Company, false)
             html += this._createContactField('Mobile', contact.Mobile, false)
-            html += this._createContactField('Email', contact.EmailAddress, false)
             html += this._createContactField('Account No', contact.AccountNo, false)
+            html += this._createContactField('Email Address', contact.EmailAddress, false)
 
             // More/Less toggle
             if (this._state.showMoreContact) {
