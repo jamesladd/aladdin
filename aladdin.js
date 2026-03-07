@@ -254,6 +254,7 @@ function aladdin(Office) {
     startEditingContact() {
       if (!this._state.contactInfo) return
       this._state.isEditingContact = true
+      this._state.showMoreContact = true
       this._state.editedContact = JSON.parse(JSON.stringify(this._state.contactInfo))
       this.saveState()
       this._updateUI()
@@ -273,9 +274,14 @@ function aladdin(Office) {
       if (!this._state.editedContact) return
 
       const saveBtn = document.getElementById('saveContactBtn')
+      const cancelBtn = document.getElementById('cancelContactBtn')
+
       if (saveBtn) {
         saveBtn.disabled = true
         saveBtn.textContent = 'Saving...'
+      }
+      if (cancelBtn) {
+        cancelBtn.disabled = true
       }
 
       try {
@@ -291,6 +297,9 @@ function aladdin(Office) {
             saveBtn.disabled = false
             saveBtn.textContent = 'Save Changes'
           }
+          if (cancelBtn) {
+            cancelBtn.disabled = false
+          }
           alert('Failed to save contact. Please try again.')
         }
       } catch (e) {
@@ -298,6 +307,9 @@ function aladdin(Office) {
         if (saveBtn) {
           saveBtn.disabled = false
           saveBtn.textContent = 'Save Changes'
+        }
+        if (cancelBtn) {
+          cancelBtn.disabled = false
         }
         alert('Error saving contact. Please try again.')
       }
@@ -416,6 +428,12 @@ function aladdin(Office) {
       this._itemHandlersRegistered = false
       this.event('ItemChanged', { type: 'item changed' })
 
+      // Exit edit mode when item changes
+      if (this._state.isEditingContact) {
+        this._state.isEditingContact = false
+        this._state.editedContact = null
+      }
+
       // Rule R2: Re-read state from localStorage
       const savedUserInfo = this._state.userInfo
       this.loadState()
@@ -491,6 +509,12 @@ function aladdin(Office) {
     async _captureCurrentItem(item) {
       if (!item) return
       if (!item.itemId) return
+
+      // Exit edit mode when capturing a new item
+      if (this._state.isEditingContact) {
+        this._state.isEditingContact = false
+        this._state.editedContact = null
+      }
 
       const email = {
         graphMessageId: this._getGraphId(item.itemId),
@@ -956,7 +980,10 @@ function aladdin(Office) {
             }
             html += '</div>'
 
+            html += '<div class="contact-edit-buttons">'
             html += '<button id="saveContactBtn" class="save-btn">Save Changes</button>'
+            html += '<button id="cancelContactBtn" class="cancel-btn">Cancel</button>'
+            html += '</div>'
             html += '</div>'
 
             contactSectionEl.innerHTML = html
@@ -983,6 +1010,14 @@ function aladdin(Office) {
             if (saveBtn) {
               saveBtn.onclick = () => {
                 this.saveEditedContact()
+              }
+            }
+
+            // Attach cancel button listener
+            const cancelBtn = document.getElementById('cancelContactBtn')
+            if (cancelBtn) {
+              cancelBtn.onclick = () => {
+                this.cancelEditingContact()
               }
             }
           } else {

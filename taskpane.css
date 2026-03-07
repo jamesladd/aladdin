@@ -219,7 +219,14 @@ body {
     transform: scale(0.98);
 }
 
+.contact-edit-buttons {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+}
+
 .save-btn {
+    flex: 1;
     background: #28a745;
     color: white;
     border: none;
@@ -228,8 +235,6 @@ body {
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
-    margin-top: 16px;
-    width: 100%;
     transition: background 0.2s;
 }
 
@@ -243,6 +248,32 @@ body {
 
 .save-btn:disabled {
     background: #6c757d;
+    cursor: not-allowed;
+}
+
+.cancel-btn {
+    flex: 1;
+    background: #6c757d;
+    color: white;
+    border: none;
+    padding: 10px 24px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.cancel-btn:hover {
+    background: #5a6268;
+}
+
+.cancel-btn:active {
+    transform: scale(0.98);
+}
+
+.cancel-btn:disabled {
+    background: #adb5bd;
     cursor: not-allowed;
 }
 
@@ -353,5 +384,9 @@ body {
 
     .actions-container {
         padding: 15px;
+    }
+
+    .contact-edit-buttons {
+        flex-direction: column;
     }
 }
