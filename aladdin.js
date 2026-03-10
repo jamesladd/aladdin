@@ -535,6 +535,7 @@ function aladdin(Office) {
       this._updateUI()
     },
     async _getUserContact(emailAddress) {
+      console.log('_getUserContact', emailAddress)
       if (!emailAddress) return null
 
       try {
@@ -555,6 +556,7 @@ function aladdin(Office) {
 
           return new Promise((resolve) => {
             mailbox.makeEwsRequestAsync(ewsRequest, (result) => {
+              console.log('user in promise', result.status === this.Office.AsyncResultStatus.Succeeded)
               if (result.status === this.Office.AsyncResultStatus.Succeeded) {
                 try {
                   const parser = new DOMParser()
@@ -562,6 +564,7 @@ function aladdin(Office) {
                   const contact = xmlDoc.querySelector('Contact')
 
                   if (contact) {
+                    console.log('selector', contact)
                     const getElementValue = (name) => {
                       const el = contact.querySelector(name)
                       return el ? el.textContent : null
@@ -594,6 +597,7 @@ function aladdin(Office) {
       return null
     },
     async _getGlobalContact(emailAddress) {
+      console.log('_getGlobalContact', emailAddress)
       if (!emailAddress) return null
 
       try {
@@ -602,6 +606,7 @@ function aladdin(Office) {
         // Get callback token for REST API
         return new Promise((resolve) => {
           mailbox.getCallbackTokenAsync({ isRest: true }, async (result) => {
+            console.log('global in promise', result.status === this.Office.AsyncResultStatus.Succeeded)
             if (result.status === this.Office.AsyncResultStatus.Succeeded) {
               try {
                 const token = result.value
@@ -620,6 +625,7 @@ function aladdin(Office) {
 
                 if (response.ok) {
                   const data = await response.json()
+                  console.log('global data', data)
                   if (data.value && data.value.length > 0) {
                     const contact = data.value[0]
                     resolve({
@@ -751,12 +757,10 @@ function aladdin(Office) {
           // Get user contact
           const userContact = await this._getUserContact(email.from.email)
           this.event('UserContactRetrieved', { email: email.from.email, found: !!userContact })
-          console.log('User contact', userContact)
 
           // Get global contact
           const globalContact = await this._getGlobalContact(email.from.email)
           this.event('GlobalContactRetrieved', { email: email.from.email, found: !!globalContact })
-          console.log('Global contact', globalContact)
 
           // Call API with all three pieces of information
           const contactInfo = await this.getContact(email.from.email, userContact, globalContact)

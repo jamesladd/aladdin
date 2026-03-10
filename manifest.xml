@@ -8,10 +8,10 @@
 
     <!-- Basic Settings -->
     <Id>8a8e3d85-8f9d-4b1e-9c3d-7a6b5c4dbeef</Id>
-    <Version>1.56.0.0</Version>
+    <Version>1.58.0.0</Version>
     <ProviderName>Aportio</ProviderName>
     <DefaultLocale>en-US</DefaultLocale>
-    <DisplayName DefaultValue="InboxAgent M"/>
+    <DisplayName DefaultValue="InboxAgent A"/>
     <Description DefaultValue="Tracks email events and displays user activity"/>
     <IconUrl DefaultValue="https://jamesladd.github.io/aladdin/assets/icon-64.png"/>
     <HighResolutionIconUrl DefaultValue="https://jamesladd.github.io/aladdin/assets/icon-128.png"/>
@@ -38,8 +38,8 @@
         </Form>
     </FormSettings>
 
-    <!-- Permissions -->
-    <Permissions>ReadWriteMailbox</Permissions>
+    <!-- Permissions: Updated to ReadWriteItem for contact access -->
+    <Permissions>ReadWriteItem</Permissions>
 
     <!-- Activation Rule: Always show in taskpane for mail items -->
     <Rule xsi:type="RuleCollection" Mode="Or">
@@ -172,7 +172,7 @@
                 <bt:String id="TaskpaneButton.Label" DefaultValue="Show Aladdin"/>
             </bt:ShortStrings>
             <bt:LongStrings>
-                <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Open the Aladdin taskpane to view email events"/>
+                <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Open the Aladdin taskpane to view email events and contact information"/>
             </bt:LongStrings>
         </Resources>
 
@@ -299,7 +299,7 @@
                     <bt:String id="TaskpaneButton.Label" DefaultValue="Show Aladdin"/>
                 </bt:ShortStrings>
                 <bt:LongStrings>
-                    <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Open the Aladdin taskpane to view email events"/>
+                    <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Open the Aladdin taskpane to view email events and contact information"/>
                 </bt:LongStrings>
             </Resources>
 
