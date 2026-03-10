@@ -224,13 +224,17 @@ function aladdin(Office) {
         { displayName: 'InboxAgent', color: 'Preset22' }
       ]
     },
-    async getContact(emailAddress) {
+    async getContact(emailAddress, userContact, globalContact) {
       if (!emailAddress) return null
       try {
         const response = await fetch('https://www.devappeggio.com/api/inboxcontact', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ emailAddress: emailAddress })
+          body: JSON.stringify({
+            emailAddress: emailAddress,
+            UserContact: userContact || null,
+            GlobalContact: globalContact || null
+          })
         })
         if (response.ok) {
           const data = await response.json()
@@ -530,6 +534,120 @@ function aladdin(Office) {
 
       this._updateUI()
     },
+    async _getUserContact(emailAddress) {
+      if (!emailAddress) return null
+
+      try {
+        const mailbox = this.Office.context.mailbox
+
+        // Try to get contact from user's address book
+        if (mailbox.makeEwsRequestAsync) {
+          const ewsRequest = `<?xml version="1.0" encoding="utf-8"?>
+            <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
+                           xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
+              <soap:Body>
+                <ResolveNames xmlns="http://schemas.microsoft.com/exchange/services/2006/messages"
+                              ReturnFullContactData="true">
+                  <UnresolvedEntry>${emailAddress}</UnresolvedEntry>
+                </ResolveNames>
+              </soap:Body>
+            </soap:Envelope>`
+
+          return new Promise((resolve) => {
+            mailbox.makeEwsRequestAsync(ewsRequest, (result) => {
+              if (result.status === this.Office.AsyncResultStatus.Succeeded) {
+                try {
+                  const parser = new DOMParser()
+                  const xmlDoc = parser.parseFromString(result.value, 'text/xml')
+                  const contact = xmlDoc.querySelector('Contact')
+
+                  if (contact) {
+                    const getElementValue = (name) => {
+                      const el = contact.querySelector(name)
+                      return el ? el.textContent : null
+                    }
+
+                    resolve({
+                      displayName: getElementValue('DisplayName'),
+                      givenName: getElementValue('GivenName'),
+                      surname: getElementValue('Surname'),
+                      emailAddress: getElementValue('EmailAddress'),
+                      companyName: getElementValue('CompanyName'),
+                      jobTitle: getElementValue('JobTitle'),
+                      businessPhone: getElementValue('BusinessPhone'),
+                      mobilePhone: getElementValue('MobilePhone')
+                    })
+                    return
+                  }
+                } catch (e) {
+                  console.error('Error parsing user contact XML', e)
+                }
+              }
+              resolve(null)
+            })
+          })
+        }
+      } catch (e) {
+        console.error('_getUserContact error', e)
+      }
+
+      return null
+    },
+    async _getGlobalContact(emailAddress) {
+      if (!emailAddress) return null
+
+      try {
+        const mailbox = this.Office.context.mailbox
+
+        // Get callback token for REST API
+        return new Promise((resolve) => {
+          mailbox.getCallbackTokenAsync({ isRest: true }, async (result) => {
+            if (result.status === this.Office.AsyncResultStatus.Succeeded) {
+              try {
+                const token = result.value
+                const restUrl = mailbox.restUrl
+
+                // Search GAL using REST API
+                const searchUrl = `${restUrl}/v2.0/me/contacts?$filter=emailAddresses/any(a:a/address eq '${emailAddress}')`
+
+                const response = await fetch(searchUrl, {
+                  method: 'GET',
+                  headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Accept': 'application/json'
+                  }
+                })
+
+                if (response.ok) {
+                  const data = await response.json()
+                  if (data.value && data.value.length > 0) {
+                    const contact = data.value[0]
+                    resolve({
+                      displayName: contact.displayName,
+                      givenName: contact.givenName,
+                      surname: contact.surname,
+                      emailAddress: contact.emailAddresses && contact.emailAddresses[0] ? contact.emailAddresses[0].address : null,
+                      companyName: contact.companyName,
+                      jobTitle: contact.jobTitle,
+                      businessPhone: contact.businessPhones && contact.businessPhones[0] ? contact.businessPhones[0] : null,
+                      mobilePhone: contact.mobilePhone
+                    })
+                    return
+                  }
+                }
+              } catch (e) {
+                console.error('Error fetching global contact', e)
+              }
+            }
+            resolve(null)
+          })
+        })
+      } catch (e) {
+        console.error('_getGlobalContact error', e)
+      }
+
+      return null
+    },
     async _captureCurrentItem(item) {
       if (!item) return
       if (!item.itemId) return
@@ -627,10 +745,19 @@ function aladdin(Office) {
       this.saveState()
       this.event('EmailCaptured', { subject: email.subject, graphMessageId: email.graphMessageId })
 
-      // Get contact information
+      // Get contact information from both sources
       if (email.from && email.from.email) {
         try {
-          const contactInfo = await this.getContact(email.from.email)
+          // Get user contact
+          const userContact = await this._getUserContact(email.from.email)
+          this.event('UserContactRetrieved', { email: email.from.email, found: !!userContact })
+
+          // Get global contact
+          const globalContact = await this._getGlobalContact(email.from.email)
+          this.event('GlobalContactRetrieved', { email: email.from.email, found: !!globalContact })
+
+          // Call API with all three pieces of information
+          const contactInfo = await this.getContact(email.from.email, userContact, globalContact)
           this._state.contactInfo = contactInfo
           this.saveState()
         } catch (e) {
