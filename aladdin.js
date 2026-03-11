@@ -1040,6 +1040,19 @@ function aladdin(Office) {
 
       return html
     },
+    _formatRecipientsList(recipients) {
+      if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
+        return '-'
+      }
+      return recipients.map(r => {
+        const name = r.name || ''
+        const email = r.email || ''
+        if (name && email) {
+          return name + ' <' + email + '>'
+        }
+        return email || name || 'Unknown'
+      }).join(', ')
+    },
     _updateUI() {
       if (typeof document === 'undefined') return
 
@@ -1324,9 +1337,105 @@ function aladdin(Office) {
         conversationSummarySectionEl.innerHTML = '<div class="no-conversation-summary">No conversation summary available</div>'
       }
 
+      // Update email attributes section
+      this._updateEmailAttributesUI()
+
       // Update actions section
       if (actionsSectionEl) {
         actionsSectionEl.innerHTML = '<div class="no-actions">No actions available</div>'
+      }
+    },
+    _updateEmailAttributesUI() {
+      if (typeof document === 'undefined') return
+
+      const emailAttributesSectionEl = document.getElementById('emailAttributesSection')
+      if (!emailAttributesSectionEl) return
+
+      const email = this._state.capturedEmail
+
+      if (email) {
+        let html = '<div class="email-attributes-container">'
+
+        // Subject
+        html += '<div class="email-attribute">'
+        html += '<span class="field-label">Subject:</span> '
+        html += '<span class="field-value">' + this._escapeHtml(email.subject || '-') + '</span>'
+        html += '</div>'
+
+        // From
+        html += '<div class="email-attribute">'
+        html += '<span class="field-label">From:</span> '
+        if (email.from) {
+          const fromName = email.from.name || ''
+          const fromEmail = email.from.email || ''
+          if (fromName && fromEmail) {
+            html += '<span class="field-value">' + this._escapeHtml(fromName) + ' &lt;' + this._escapeHtml(fromEmail) + '&gt;</span>'
+          } else {
+            html += '<span class="field-value">' + this._escapeHtml(fromEmail || fromName || '-') + '</span>'
+          }
+        } else {
+          html += '<span class="field-value">-</span>'
+        }
+        html += '</div>'
+
+        // To
+        html += '<div class="email-attribute">'
+        html += '<span class="field-label">To:</span> '
+        html += '<span class="field-value">' + this._escapeHtml(this._formatRecipientsList(email.to)) + '</span>'
+        html += '</div>'
+
+        // CC (only show if present)
+        if (email.cc && email.cc.length > 0) {
+          html += '<div class="email-attribute">'
+          html += '<span class="field-label">CC:</span> '
+          html += '<span class="field-value">' + this._escapeHtml(this._formatRecipientsList(email.cc)) + '</span>'
+          html += '</div>'
+        }
+
+        // Importance
+        html += '<div class="email-attribute">'
+        html += '<span class="field-label">Importance:</span> '
+        const importance = email.importance || 'normal'
+        let importanceClass = 'importance-normal'
+        if (importance === 'high') importanceClass = 'importance-high'
+        else if (importance === 'low') importanceClass = 'importance-low'
+        html += '<span class="importance-badge ' + importanceClass + '">' + this._escapeHtml(importance) + '</span>'
+        html += '</div>'
+
+        // Sentiment
+        html += '<div class="email-attribute">'
+        html += '<span class="field-label">Sentiment:</span> '
+        const sentiment = email.sentiment || 'neutral'
+        let sentimentClass = 'sentiment-neutral'
+        if (sentiment === 'positive') sentimentClass = 'sentiment-positive'
+        else if (sentiment === 'negative') sentimentClass = 'sentiment-negative'
+        html += '<span class="sentiment-badge ' + sentimentClass + '">' + this._escapeHtml(sentiment) + '</span>'
+        html += '</div>'
+
+        // Categories
+        if (email.categories && email.categories.length > 0) {
+          html += '<div class="email-attribute">'
+          html += '<span class="field-label">Categories:</span> '
+          html += '<div class="category-tags">'
+          email.categories.forEach(function(cat) {
+            html += '<span class="category-tag">' + this._escapeHtml(cat) + '</span>'
+          }.bind(this))
+          html += '</div>'
+          html += '</div>'
+        }
+
+        // Attachments
+        if (email.attachments && email.attachments.length > 0) {
+          html += '<div class="email-attribute">'
+          html += '<span class="field-label">Attachments:</span> '
+          html += '<span class="field-value">' + email.attachments.length + ' file(s)</span>'
+          html += '</div>'
+        }
+
+        html += '</div>'
+        emailAttributesSectionEl.innerHTML = html
+      } else {
+        emailAttributesSectionEl.innerHTML = '<div class="no-email-attributes">No email selected</div>'
       }
     },
     _escapeHtml(text) {
