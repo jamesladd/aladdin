@@ -1388,14 +1388,6 @@ function aladdin(Office) {
           html += '</div>'
         }
 
-        // Attachments
-        if (email.attachments && email.attachments.length > 0) {
-          html += '<div class="email-attribute">'
-          html += '<span class="field-label">Attachments:</span> '
-          html += '<span class="field-value">' + email.attachments.length + ' file(s)</span>'
-          html += '</div>'
-        }
-
         html += '</div>'
         emailAttributesSectionEl.innerHTML = html
       } else {
