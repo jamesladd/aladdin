@@ -562,7 +562,7 @@ function aladdin(Office) {
                   const parser = new DOMParser()
                   const xmlDoc = parser.parseFromString(result.value, 'text/xml')
                   const contact = xmlDoc.querySelector('Contact')
-
+                  console.log('Result (user)', result.value)
                   if (contact) {
                     console.log('selector', contact)
                     const getElementValue = (name) => {
@@ -585,10 +585,14 @@ function aladdin(Office) {
                 } catch (e) {
                   console.error('Error parsing user contact XML', e)
                 }
+              } else {
+                console.log('Failed to get Ews (user)')
               }
               resolve(null)
             })
           })
+        } else {
+          console.warn('No makeEwsRequestAsync')
         }
       } catch (e) {
         console.error('_getUserContact error', e)
@@ -644,6 +648,8 @@ function aladdin(Office) {
               } catch (e) {
                 console.error('Error fetching global contact', e)
               }
+            } else {
+              console.log('Failed to get Ews (global)')
             }
             resolve(null)
           })
