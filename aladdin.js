@@ -1356,42 +1356,6 @@ function aladdin(Office) {
       if (email) {
         let html = '<div class="email-attributes-container">'
 
-        // Subject
-        html += '<div class="email-attribute">'
-        html += '<span class="field-label">Subject:</span> '
-        html += '<span class="field-value">' + this._escapeHtml(email.subject || '-') + '</span>'
-        html += '</div>'
-
-        // From
-        html += '<div class="email-attribute">'
-        html += '<span class="field-label">From:</span> '
-        if (email.from) {
-          const fromName = email.from.name || ''
-          const fromEmail = email.from.email || ''
-          if (fromName && fromEmail) {
-            html += '<span class="field-value">' + this._escapeHtml(fromName) + ' &lt;' + this._escapeHtml(fromEmail) + '&gt;</span>'
-          } else {
-            html += '<span class="field-value">' + this._escapeHtml(fromEmail || fromName || '-') + '</span>'
-          }
-        } else {
-          html += '<span class="field-value">-</span>'
-        }
-        html += '</div>'
-
-        // To
-        html += '<div class="email-attribute">'
-        html += '<span class="field-label">To:</span> '
-        html += '<span class="field-value">' + this._escapeHtml(this._formatRecipientsList(email.to)) + '</span>'
-        html += '</div>'
-
-        // CC (only show if present)
-        if (email.cc && email.cc.length > 0) {
-          html += '<div class="email-attribute">'
-          html += '<span class="field-label">CC:</span> '
-          html += '<span class="field-value">' + this._escapeHtml(this._formatRecipientsList(email.cc)) + '</span>'
-          html += '</div>'
-        }
-
         // Importance
         html += '<div class="email-attribute">'
         html += '<span class="field-label">Importance:</span> '

@@ -149,29 +149,6 @@ body {
     margin-bottom: 12px;
 }
 
-.vip-field {
-    margin-bottom: 16px;
-}
-
-.vip-checkbox-label {
-    display: flex;
-    align-items: center;
-    cursor: pointer;
-    user-select: none;
-}
-
-.vip-checkbox-label input[type="checkbox"] {
-    cursor: pointer;
-    width: 18px;
-    height: 18px;
-    margin: 0;
-}
-
-.vip-checkbox-text {
-    font-weight: 600;
-    color: #667eea;
-}
-
 .contact-field {
     font-size: 14px;
     color: #555;
@@ -189,11 +166,6 @@ body {
 
 .contact-field a:hover {
     border-bottom-color: #667eea;
-}
-
-.field-empty {
-    color: #999;
-    font-style: italic;
 }
 
 .contact-field-edit {
@@ -230,6 +202,11 @@ body {
 
 .field-value {
     color: #555;
+}
+
+.field-empty {
+    color: #999;
+    font-style: italic;
 }
 
 .contact-more {
