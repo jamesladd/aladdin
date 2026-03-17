@@ -297,7 +297,7 @@ body {
 .no-contact {
     text-align: center;
     color: #999;
-    padding: 20px;
+    padding: 10px 20px 10px 20px;
     font-style: italic;
 }
 
@@ -312,7 +312,7 @@ body {
 .no-conversation-summary {
     text-align: center;
     color: #999;
-    padding: 20px;
+    padding: 10px 20px 10px 20px;
     font-style: italic;
 }
 
@@ -418,7 +418,7 @@ body {
 .no-actions {
     text-align: center;
     color: #999;
-    padding: 20px;
+    padding: 10px 20px 10px 20px;
     font-style: italic;
 }
 
