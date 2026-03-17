@@ -297,7 +297,7 @@ body {
 .no-contact {
     text-align: center;
     color: #999;
-    padding: 40px 20px;
+    padding: 20px;
     font-style: italic;
 }
 
@@ -312,7 +312,7 @@ body {
 .no-conversation-summary {
     text-align: center;
     color: #999;
-    padding: 40px 20px;
+    padding: 20px;
     font-style: italic;
 }
 
@@ -403,7 +403,7 @@ body {
 .no-email-attributes {
     text-align: center;
     color: #999;
-    padding: 40px 20px;
+    padding: 20px;
     font-style: italic;
 }
 
@@ -418,7 +418,7 @@ body {
 .no-actions {
     text-align: center;
     color: #999;
-    padding: 40px 20px;
+    padding: 20px;
     font-style: italic;
 }
 
@@ -431,19 +431,19 @@ body {
 }
 
 .user-name {
-    font-size: 18px;
+    font-size: 14px;
     font-weight: 600;
     color: #333;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
 .info-row {
-    font-size: 14px;
+    font-size: 12px;
     color: #555;
-    margin-top: 6px;
+    margin-top: 4px;
     display: flex;
     align-items: baseline;
     min-width: 0;
@@ -475,7 +475,11 @@ body {
     }
 
     .user-name {
-        font-size: 16px;
+        font-size: 13px;
+    }
+
+    .info-row {
+        font-size: 11px;
     }
 
     .contact-card {

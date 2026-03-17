@@ -1168,20 +1168,12 @@ function aladdin(Office) {
                 html += this._createContactField('Last Contacted', this._formatTimestamp(contact.LastContactedAt), false)
               }
               html += '</div>'
-              html += '<button id="toggleContactBtn" class="toggle-btn">Less</button>'
             }
 
             html += '</div>'
             contactSectionEl.innerHTML = html
 
             // Attach event listeners
-            const toggleBtn = document.getElementById('toggleContactBtn')
-            if (toggleBtn) {
-              toggleBtn.onclick = () => {
-                this.toggleMoreContact()
-              }
-            }
-
             const editBtn = document.getElementById('editContactBtn')
             if (editBtn) {
               editBtn.onclick = () => {
