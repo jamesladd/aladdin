@@ -454,10 +454,29 @@ function aladdin(Office) {
       this._itemHandlersRegistered = false
       this.event('ItemChanged', { type: 'item changed' })
 
-      // Exit edit mode when item changes
+      // Check if we're in edit mode with unsaved changes
       if (this._state.isEditingContact) {
-        this._state.isEditingContact = false
-        this._state.editedContact = null
+        const hasEdits = this._hasContactEdits()
+
+        if (hasEdits) {
+          // Prompt user to save or discard changes
+          const shouldSave = await this._promptSaveChanges()
+
+          if (shouldSave) {
+            // Save changes before proceeding
+            await this.saveEditedContact()
+          } else {
+            // Discard changes
+            this._state.isEditingContact = false
+            this._state.editedContact = null
+            this.saveState()
+          }
+        } else {
+          // No edits, silently exit edit mode
+          this._state.isEditingContact = false
+          this._state.editedContact = null
+          this.saveState()
+        }
       }
 
       // Rule R2: Re-read state from localStorage
@@ -536,10 +555,30 @@ function aladdin(Office) {
       if (!item) return
       if (!item.itemId) return
 
-      // Exit edit mode when capturing a new item
+      // Check if we're in edit mode - this handles the case when item selection
+      // triggers capture without going through _handleItemChanged
       if (this._state.isEditingContact) {
-        this._state.isEditingContact = false
-        this._state.editedContact = null
+        const hasEdits = this._hasContactEdits()
+
+        if (hasEdits) {
+          // Prompt user to save or discard changes
+          const shouldSave = await this._promptSaveChanges()
+
+          if (shouldSave) {
+            // Save changes before proceeding
+            await this.saveEditedContact()
+          } else {
+            // Discard changes
+            this._state.isEditingContact = false
+            this._state.editedContact = null
+            this.saveState()
+          }
+        } else {
+          // No edits, silently exit edit mode
+          this._state.isEditingContact = false
+          this._state.editedContact = null
+          this.saveState()
+        }
       }
 
       const email = {
@@ -833,6 +872,78 @@ function aladdin(Office) {
         return CategoryColor.None || 0
       } catch (e) {
         return 0
+      }
+    },
+    _hasContactEdits() {
+      // Check if there are any edits to the contact
+      if (!this._state.isEditingContact || !this._state.editedContact || !this._state.contactInfo) {
+        return false
+      }
+
+      const original = this._state.contactInfo
+      const edited = this._state.editedContact
+
+      // Compare all editable fields
+      const fieldsToCompare = [
+        'Firstname', 'Surname', 'JobTitle', 'Company', 'Mobile', 'AccountNo', 'EmailAddress',
+        'Street1', 'Street2', 'City', 'PostCode', 'EmailNameAlias',
+        'Linkedin', 'X', 'Facebook', 'Instagram', 'OtherChan1', 'OtherChan2',
+        'SubscriberAttr1', 'SubscriberAttr2', 'SubscriberAttr3', 'SubscriberAttr4',
+        'VIPStatus'
+      ]
+
+      for (const field of fieldsToCompare) {
+        const origValue = original[field] || ''
+        const editValue = edited[field] || ''
+
+        // For VIPStatus, compare as booleans
+        if (field === 'VIPStatus') {
+          if (Boolean(origValue) !== Boolean(editValue)) {
+            return true
+          }
+        } else {
+          // For other fields, compare as strings
+          if (String(origValue) !== String(editValue)) {
+            return true
+          }
+        }
+      }
+
+      return false
+    },
+    async _promptSaveChanges() {
+      // Prompt user to save or discard changes
+      // Returns true if user wants to save, false if they want to discard
+      return new Promise((resolve) => {
+        const result = confirm('You have unsaved contact changes. Do you want to save them?\n\nClick OK to save, or Cancel to discard.')
+        resolve(result)
+      })
+    },
+    async _handleEditButtonClick() {
+      // Handle edit button click when already in edit mode
+      if (!this._state.isEditingContact) {
+        // Not in edit mode, start editing
+        this.startEditingContact()
+        return
+      }
+
+      // Already in edit mode
+      const hasEdits = this._hasContactEdits()
+
+      if (hasEdits) {
+        // Has edits, prompt user
+        const shouldSave = await this._promptSaveChanges()
+
+        if (shouldSave) {
+          // Save changes and exit edit mode
+          await this.saveEditedContact()
+        } else {
+          // Discard changes and exit edit mode
+          this.cancelEditingContact()
+        }
+      } else {
+        // No edits, silently exit edit mode
+        this.cancelEditingContact()
       }
     },
     _formatTimestamp(timestamp) {
@@ -1173,11 +1284,11 @@ function aladdin(Office) {
             html += '</div>'
             contactSectionEl.innerHTML = html
 
-            // Attach event listeners
+            // Attach event listeners - Modified to use _handleEditButtonClick
             const editBtn = document.getElementById('editContactBtn')
             if (editBtn) {
               editBtn.onclick = () => {
-                this.startEditingContact()
+                this._handleEditButtonClick()
               }
             }
 
