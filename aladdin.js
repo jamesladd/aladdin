@@ -12,7 +12,7 @@ export function createAladdin(Office) {
 }
 
 function aladdin(Office) {
-  console.log('Aladdin version: 1.69.0', new Date());
+  console.log('Aladdin version: 1.71.0', new Date());
   return {
     Office,
     _currentItemId: null,
@@ -1285,7 +1285,7 @@ function aladdin(Office) {
             html += '</div>'
             contactSectionEl.innerHTML = html
 
-            // Attach event listeners - Modified to use _handleEditButtonClick
+            // Attach event listeners - FIXED: Now uses _handleEditButtonClick
             const editBtn = document.getElementById('editContactBtn')
             if (editBtn) {
               editBtn.onclick = () => {
