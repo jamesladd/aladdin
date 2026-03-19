@@ -12,7 +12,7 @@ export function createAladdin(Office) {
 }
 
 function aladdin(Office) {
-  console.log('Aladdin version: 1.74.0', new Date());
+  console.log('Aladdin version: 1.76.0', new Date());
   return {
     Office,
     _currentItemId: null,
@@ -327,7 +327,7 @@ function aladdin(Office) {
 
         // Show error message if save failed
         if (!success) {
-          alert('Failed to save contact. Changes were not persisted to the server.')
+          this._showAlert('Failed to save contact. Changes were not persisted to the server.')
         }
       } catch (e) {
         console.error('saveEditedContact error', e)
@@ -338,7 +338,7 @@ function aladdin(Office) {
         this.saveState()
         this._updateUI()
 
-        alert('Error saving contact. Please try again.')
+        this._showAlert('Error saving contact. Please try again.')
       }
     },
 
@@ -461,7 +461,12 @@ function aladdin(Office) {
 
         if (hasEdits) {
           // Prompt user to save or discard changes
-          const shouldSave = await this._promptSaveChanges()
+          const shouldSave = await this._showConfirmDialog(
+            'Unsaved Changes',
+            'You have unsaved contact changes. Do you want to save them?',
+            'Save',
+            'Discard'
+          )
 
           if (shouldSave) {
             // Save changes before proceeding
@@ -563,7 +568,12 @@ function aladdin(Office) {
 
         if (hasEdits) {
           // Prompt user to save or discard changes
-          const shouldSave = await this._promptSaveChanges()
+          const shouldSave = await this._showConfirmDialog(
+            'Unsaved Changes',
+            'You have unsaved contact changes. Do you want to save them?',
+            'Save',
+            'Discard'
+          )
 
           if (shouldSave) {
             // Save changes before proceeding
@@ -912,12 +922,106 @@ function aladdin(Office) {
 
       return false
     },
-    async _promptSaveChanges() {
-      // Prompt user to save or discard changes
-      // Returns true if user wants to save, false if they want to discard
+    async _showConfirmDialog(title, message, confirmText, cancelText) {
+      // Create a custom confirmation dialog that works in Office Add-ins
       return new Promise((resolve) => {
-        const result = confirm('You have unsaved contact changes. Do you want to save them?\n\nClick OK to save, or Cancel to discard.')
-        resolve(result)
+        // Create overlay
+        const overlay = document.createElement('div')
+        overlay.className = 'confirm-overlay'
+
+        // Create dialog
+        const dialog = document.createElement('div')
+        dialog.className = 'confirm-dialog'
+
+        // Title
+        const titleEl = document.createElement('div')
+        titleEl.className = 'confirm-title'
+        titleEl.textContent = title
+
+        // Message
+        const messageEl = document.createElement('div')
+        messageEl.className = 'confirm-message'
+        messageEl.textContent = message
+
+        // Buttons container
+        const buttonsEl = document.createElement('div')
+        buttonsEl.className = 'confirm-buttons'
+
+        // Confirm button
+        const confirmBtn = document.createElement('button')
+        confirmBtn.className = 'confirm-btn-ok'
+        confirmBtn.textContent = confirmText || 'OK'
+        confirmBtn.onclick = () => {
+          document.body.removeChild(overlay)
+          resolve(true)
+        }
+
+        // Cancel button
+        const cancelBtn = document.createElement('button')
+        cancelBtn.className = 'confirm-btn-cancel'
+        cancelBtn.textContent = cancelText || 'Cancel'
+        cancelBtn.onclick = () => {
+          document.body.removeChild(overlay)
+          resolve(false)
+        }
+
+        // Assemble
+        buttonsEl.appendChild(cancelBtn)
+        buttonsEl.appendChild(confirmBtn)
+        dialog.appendChild(titleEl)
+        dialog.appendChild(messageEl)
+        dialog.appendChild(buttonsEl)
+        overlay.appendChild(dialog)
+        document.body.appendChild(overlay)
+
+        // Focus confirm button
+        confirmBtn.focus()
+      })
+    },
+    async _showAlert(message) {
+      // Create a custom alert dialog that works in Office Add-ins
+      return new Promise((resolve) => {
+        // Create overlay
+        const overlay = document.createElement('div')
+        overlay.className = 'confirm-overlay'
+
+        // Create dialog
+        const dialog = document.createElement('div')
+        dialog.className = 'confirm-dialog'
+
+        // Title
+        const titleEl = document.createElement('div')
+        titleEl.className = 'confirm-title'
+        titleEl.textContent = 'Notice'
+
+        // Message
+        const messageEl = document.createElement('div')
+        messageEl.className = 'confirm-message'
+        messageEl.textContent = message
+
+        // Buttons container
+        const buttonsEl = document.createElement('div')
+        buttonsEl.className = 'confirm-buttons'
+
+        // OK button
+        const okBtn = document.createElement('button')
+        okBtn.className = 'confirm-btn-ok'
+        okBtn.textContent = 'OK'
+        okBtn.onclick = () => {
+          document.body.removeChild(overlay)
+          resolve()
+        }
+
+        // Assemble
+        buttonsEl.appendChild(okBtn)
+        dialog.appendChild(titleEl)
+        dialog.appendChild(messageEl)
+        dialog.appendChild(buttonsEl)
+        overlay.appendChild(dialog)
+        document.body.appendChild(overlay)
+
+        // Focus OK button
+        okBtn.focus()
       })
     },
     async _handleEditButtonClick() {
@@ -933,7 +1037,13 @@ function aladdin(Office) {
 
       if (hasEdits) {
         // Has edits, prompt user
-        const shouldSave = await this._promptSaveChanges()
+        const shouldSave = await this._showConfirmDialog(
+          'Unsaved Changes',
+          'You have unsaved contact changes. Do you want to save them?',
+          'Save',
+          'Discard'
+        )
+
         if (shouldSave) {
           // Save changes and exit edit mode
           await this.saveEditedContact()
