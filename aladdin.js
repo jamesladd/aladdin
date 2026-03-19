@@ -12,7 +12,7 @@ export function createAladdin(Office) {
 }
 
 function aladdin(Office) {
-  console.log('Aladdin version: 1.72.0', new Date());
+  console.log('Aladdin version: 1.74.0', new Date());
   return {
     Office,
     _currentItemId: null,
@@ -921,7 +921,6 @@ function aladdin(Office) {
       })
     },
     async _handleEditButtonClick() {
-      console.log('_handleEditButtonClick', this._state.isEditingContact)
       // Handle edit button click when already in edit mode
       if (!this._state.isEditingContact) {
         // Not in edit mode, start editing
@@ -929,25 +928,21 @@ function aladdin(Office) {
         return
       }
 
-      // Already in edit mode
+      // Already in edit mode - check for edits
       const hasEdits = this._hasContactEdits()
-      console.log('_handleEditButtonClick - hasEdits', hasEdits)
 
       if (hasEdits) {
         // Has edits, prompt user
         const shouldSave = await this._promptSaveChanges()
-        console.log('_handleEditButtonClick - should save?', shouldSave)
         if (shouldSave) {
           // Save changes and exit edit mode
           await this.saveEditedContact()
         } else {
           // Discard changes and exit edit mode
-          console.log('_handleEditButtonClick - discard edit mode')
           this.cancelEditingContact()
         }
       } else {
         // No edits, silently exit edit mode
-        console.log('_handleEditButtonClick - exit edit mode')
         this.cancelEditingContact()
       }
     },
@@ -1037,6 +1032,23 @@ function aladdin(Office) {
         }
         return email || name || 'Unknown'
       }).join(', ')
+    },
+    _attachContactEventListeners() {
+      // Attach edit button listener
+      const editBtn = document.getElementById('editContactBtn')
+      if (editBtn) {
+        editBtn.onclick = () => {
+          this._handleEditButtonClick()
+        }
+      }
+
+      // Attach chevron button listener
+      const chevronBtn = document.getElementById('toggleChevronBtn')
+      if (chevronBtn) {
+        chevronBtn.onclick = () => {
+          this.toggleMoreContact()
+        }
+      }
     },
     _updateUI() {
       if (typeof document === 'undefined') return
@@ -1288,22 +1300,10 @@ function aladdin(Office) {
 
             html += '</div>'
             contactSectionEl.innerHTML = html
-
-            // Attach event listeners - FIXED: Now uses _handleEditButtonClick
-            const editBtn = document.getElementById('editContactBtn')
-            if (editBtn) {
-              editBtn.onclick = () => {
-                this._handleEditButtonClick()
-              }
-            }
-
-            const chevronBtn = document.getElementById('toggleChevronBtn')
-            if (chevronBtn) {
-              chevronBtn.onclick = () => {
-                this.toggleMoreContact()
-              }
-            }
           }
+
+          // FIXED: Always attach event listeners after updating innerHTML
+          this._attachContactEventListeners()
         } else {
           contactSectionEl.innerHTML = '<div class="no-contact">No contact information available</div>'
         }
