@@ -12,7 +12,7 @@ export function createAladdin(Office) {
 }
 
 function aladdin(Office) {
-  console.log('Aladdin version: 1.78.0', new Date());
+  console.log('Aladdin version: 1.79.0', new Date());
   return {
     Office,
     _currentItemId: null,
@@ -92,6 +92,12 @@ function aladdin(Office) {
     async initialize() {
       try {
         const mailbox = this.Office.context.mailbox
+
+        console.log('Mailbox diagnostics:', {
+          platform: this._getPlatform(),
+          itemType: mailbox.item ? mailbox.item.itemType : 'none',
+          itemMode: mailbox.item ? (mailbox.item.itemId ? 'read' : 'compose') : 'none'
+        })
 
         // Rule R5: Compute userInfo synchronously and update UI immediately
         const userInfo = {
