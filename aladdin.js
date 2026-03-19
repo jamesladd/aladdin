@@ -12,7 +12,7 @@ export function createAladdin(Office) {
 }
 
 function aladdin(Office) {
-  console.log('Aladdin version: 1.79.0', new Date());
+  console.log('Aladdin version: 1.80.0', new Date());
   return {
     Office,
     _currentItemId: null,
@@ -202,15 +202,44 @@ function aladdin(Office) {
     },
     async notify(emailData) {
       if (!emailData) return
+
+      // Skip if offline
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        this.event('NotifySkipped', { reason: 'offline' })
+        return
+      }
+
       this.event('Notify', { subject: emailData.subject, graphMessageId: emailData.graphMessageId })
+
       try {
-        await fetch('https://www.devappeggio.com/api/inboxnotify', {
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 5000)
+        const response = await fetch('https://www.devappeggio.com/api/inboxnotify', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(emailData)
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify(emailData),
+          signal: controller.signal,
+          mode: 'cors'
         })
+
+        clearTimeout(timeoutId)
+        if (response.ok) {
+          this.event('NotifySuccess', { graphMessageId: emailData.graphMessageId })
+        } else {
+          this.event('NotifyFailed', { status: response.status })
+          console.warn('notify returned status:', response.status)
+        }
       } catch (e) {
-        console.error('notify fetch error', e)
+        if (e.name === 'AbortError') {
+          this.event('NotifyTimeout', { graphMessageId: emailData.graphMessageId })
+          console.warn('notify timed out after 5s')
+        } else {
+          this.event('NotifyError', { error: e.message })
+          console.warn('notify error:', e.message)
+        }
       }
     },
     async getCategories(info) {
