@@ -524,7 +524,7 @@ body {
     display: flex;
     align-items: flex-start; /* Changed from center to flex-start */
     justify-content: center;
-    padding-top: 25vh; /* Add 25% viewport height from top */
+    padding-top: 15vh; /* Add 25% viewport height from top */
     z-index: 10000;
 }
 
