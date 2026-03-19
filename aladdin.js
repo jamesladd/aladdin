@@ -12,7 +12,7 @@ export function createAladdin(Office) {
 }
 
 function aladdin(Office) {
-  console.log('Aladdin version: 1.81.0', new Date());
+  console.log('Aladdin version: 1.82.0', new Date());
   return {
     Office,
     _currentItemId: null,
