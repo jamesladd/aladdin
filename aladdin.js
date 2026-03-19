@@ -12,7 +12,7 @@ export function createAladdin(Office) {
 }
 
 function aladdin(Office) {
-  console.log('Aladdin version: 1.71.0', new Date());
+  console.log('Aladdin version: 1.72.0', new Date());
   return {
     Office,
     _currentItemId: null,
@@ -921,6 +921,7 @@ function aladdin(Office) {
       })
     },
     async _handleEditButtonClick() {
+      console.log('_handleEditButtonClick', this._state.isEditingContact)
       // Handle edit button click when already in edit mode
       if (!this._state.isEditingContact) {
         // Not in edit mode, start editing
@@ -930,20 +931,23 @@ function aladdin(Office) {
 
       // Already in edit mode
       const hasEdits = this._hasContactEdits()
+      console.log('_handleEditButtonClick - hasEdits', hasEdits)
 
       if (hasEdits) {
         // Has edits, prompt user
         const shouldSave = await this._promptSaveChanges()
-
+        console.log('_handleEditButtonClick - should save?', shouldSave)
         if (shouldSave) {
           // Save changes and exit edit mode
           await this.saveEditedContact()
         } else {
           // Discard changes and exit edit mode
+          console.log('_handleEditButtonClick - discard edit mode')
           this.cancelEditingContact()
         }
       } else {
         // No edits, silently exit edit mode
+        console.log('_handleEditButtonClick - exit edit mode')
         this.cancelEditingContact()
       }
     },
