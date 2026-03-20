@@ -12,7 +12,7 @@ export function createAladdin(Office) {
 }
 
 function aladdin(Office) {
-  console.log('Aladdin version: 1.82.0', new Date());
+  console.log('Aladdin version: 1.84.0', new Date());
   return {
     Office,
     _currentItemId: null,
@@ -423,8 +423,10 @@ function aladdin(Office) {
           return this.Office.context.mailbox.convertToRestId(itemId, this.Office.MailboxEnums.RestVersion.v2_0)
         }
       } catch (e) {
-        console.error('convertToRestId error, using raw itemId', e)
+        // convertToRestId can fail for shared mailbox items - log warning but continue
+        console.warn('convertToRestId failed, using raw itemId', e)
       }
+      // Always return the itemId even if conversion fails
       return itemId
     },
     _registerMailboxEvents() {
