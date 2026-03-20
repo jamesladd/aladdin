@@ -12,7 +12,7 @@ export function createAladdin(Office) {
 }
 
 function aladdin(Office) {
-  console.log('Aladdin version: 1.84.0', new Date());
+  console.log('Aladdin version: 1.85.0', new Date());
   return {
     Office,
     _currentItemId: null,
@@ -630,7 +630,9 @@ function aladdin(Office) {
       }
 
       const email = {
-        graphMessageId: this._getGraphId(item.itemId),
+        itemId: item.itemId,  // ← ADD THIS: Raw item ID (always available)
+        graphMessageId: this._getGraphId(item.itemId),  // ← Converted ID (may be same as itemId if conversion fails)
+        internetMessageId: null,
         to: [],
         from: null,
         cc: [],
@@ -696,6 +698,8 @@ function aladdin(Office) {
       // Internet headers
       try {
         email.internetHeaders = await this._getInternetHeaders(item)
+        // Extract Internet Message ID for reliable server-side lookups
+        email.internetMessageId = email.internetHeaders['Message-ID'] || null
       } catch (e) {
         console.error('Error getting Internet Headers', e)
       }
