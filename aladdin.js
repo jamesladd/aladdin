@@ -12,7 +12,7 @@ export function createAladdin(Office) {
 }
 
 function aladdin(Office) {
-  console.log('Aladdin version: 1.90.0', new Date());
+  console.log('Aladdin version: 1.91.0', new Date());
   return {
     Office,
     _currentItemId: null,
@@ -77,7 +77,7 @@ function aladdin(Office) {
       })
     },
     event(name, details) {
-      console.log('Event:', name)
+      console.log('Event:', name, details || '')
       const entry = {
         name: name,
         timestamp: new Date().toISOString(),
@@ -93,10 +93,25 @@ function aladdin(Office) {
       try {
         const mailbox = this.Office.context.mailbox
 
+        // Enhanced diagnostics for shared mailbox detection
+        const isSharedMailbox = this._isSharedMailbox()
+        const itemType = mailbox.item ? mailbox.item.itemType : 'none'
+        const itemMode = mailbox.item ? (mailbox.item.itemId ? 'read' : 'compose') : 'none'
+
         console.log('Mailbox diagnostics:', {
           platform: this._getPlatform(),
-          itemType: mailbox.item ? mailbox.item.itemType : 'none',
-          itemMode: mailbox.item ? (mailbox.item.itemId ? 'read' : 'compose') : 'none'
+          itemType: itemType,
+          itemMode: itemMode,
+          isSharedMailbox: isSharedMailbox,
+          hasItem: !!mailbox.item,
+          userProfileEmail: this._getUserEmail()
+        })
+
+        this.event('Initialize', {
+          platform: this._getPlatform(),
+          itemType: itemType,
+          itemMode: itemMode,
+          isSharedMailbox: isSharedMailbox
         })
 
         // Rule R5: Compute userInfo synchronously and update UI immediately
@@ -105,7 +120,8 @@ function aladdin(Office) {
           userEmail: this._getUserEmail(),
           folderName: 'Unknown',
           platform: this._getPlatform(),
-          version: this._getVersion()
+          version: this._getVersion(),
+          isSharedMailbox: isSharedMailbox
         }
         this._state.userInfo = userInfo
         this._updateUI()
@@ -168,6 +184,7 @@ function aladdin(Office) {
               await this._captureCurrentItem(item)
             } catch (e) {
               console.error('captureCurrentItem error', e)
+              this.event('CaptureError', { error: e.message })
               this._updateUI()
             }
             this._registerItemEvents(item)
@@ -194,6 +211,7 @@ function aladdin(Office) {
         }
       } catch (e) {
         console.error('initialize error', e)
+        this.event('InitializeError', { error: e.message })
         this._updateUI()
       } finally {
         // Rule R5: Always update UI
@@ -379,6 +397,35 @@ function aladdin(Office) {
 
     // Private methods
 
+    _isSharedMailbox() {
+      try {
+        const mailbox = this.Office.context.mailbox
+
+        // Check if we're in a shared mailbox context
+        if (mailbox.userProfile && mailbox.item) {
+          const userEmail = mailbox.userProfile.emailAddress
+
+          // Try to get the mailbox owner's email
+          if (mailbox.item.from && typeof mailbox.item.from === 'object') {
+            // In shared mailbox, we may not have direct access to owner email
+            // but we can check diagnostics or other hints
+            return false // Assume personal mailbox by default
+          }
+        }
+
+        // Additional check: Office.context.mailbox.diagnostics
+        if (this.Office.context.diagnostics && this.Office.context.diagnostics.hostName) {
+          const hostName = this.Office.context.diagnostics.hostName
+          // This is a heuristic - may need adjustment based on actual behavior
+          return hostName.includes('Shared') || hostName.includes('Delegate')
+        }
+
+        return false
+      } catch (e) {
+        console.error('Error detecting shared mailbox', e)
+        return false
+      }
+    },
     _getUserName() {
       try {
         return this.Office.context.mailbox.userProfile.displayName || 'Unknown'
@@ -429,10 +476,12 @@ function aladdin(Office) {
               this._handleItemChanged(eventArgs)
             } catch (e) {
               console.error('Error in ItemChanged handler:', e)
+              this.event('ItemChangedError', { error: e.message })
             }
           })
         } catch (e) {
           console.error('Failed to register ItemChanged', e)
+          this.event('RegisterEventError', { event: 'ItemChanged', error: e.message })
         }
       }
 
@@ -575,6 +624,7 @@ function aladdin(Office) {
             await this._captureCurrentItem(item)
           } catch (e) {
             console.error('captureCurrentItem error', e)
+            this.event('CaptureError', { error: e.message })
             this._updateUI()
           }
           this._registerItemEvents(item)
@@ -648,6 +698,7 @@ function aladdin(Office) {
         email.to = await this._getRecipientsField(item, 'to')
       } catch (e) {
         console.error('Error getting To', e)
+        this.event('FieldError', { field: 'to', error: e.message })
       }
 
       // From
@@ -655,6 +706,7 @@ function aladdin(Office) {
         email.from = await this._getFromField(item)
       } catch (e) {
         console.error('Error getting From', e)
+        this.event('FieldError', { field: 'from', error: e.message })
       }
 
       // CC
@@ -662,6 +714,7 @@ function aladdin(Office) {
         email.cc = await this._getRecipientsField(item, 'cc')
       } catch (e) {
         console.error('Error getting CC', e)
+        this.event('FieldError', { field: 'cc', error: e.message })
       }
 
       // Subject
@@ -669,6 +722,7 @@ function aladdin(Office) {
         email.subject = await this._getSubjectField(item)
       } catch (e) {
         console.error('Error getting Subject', e)
+        this.event('FieldError', { field: 'subject', error: e.message })
       }
 
       // Attachments
@@ -678,6 +732,7 @@ function aladdin(Office) {
         }
       } catch (e) {
         console.error('Error getting Attachments', e)
+        this.event('FieldError', { field: 'attachments', error: e.message })
       }
 
       // Categories
@@ -685,6 +740,7 @@ function aladdin(Office) {
         email.categories = await this._getCategoriesField(item)
       } catch (e) {
         console.error('Error getting Categories', e)
+        this.event('FieldError', { field: 'categories', error: e.message })
       }
 
       // Importance
@@ -701,6 +757,7 @@ function aladdin(Office) {
         email.internetMessageId = email.internetHeaders['Message-ID'] || null
       } catch (e) {
         console.error('Error getting Internet Headers', e)
+        this.event('FieldError', { field: 'internetHeaders', error: e.message })
       }
 
       // Sentiment from headers
@@ -824,7 +881,10 @@ function aladdin(Office) {
       return []
     },
     async _getInternetHeaders(item) {
-      if (!item.getAllInternetHeadersAsync) return {}
+      if (!item.getAllInternetHeadersAsync) {
+        console.warn('getAllInternetHeadersAsync not available')
+        return {}
+      }
       return new Promise((resolve) => {
         try {
           item.getAllInternetHeadersAsync((result) => {
@@ -878,6 +938,17 @@ function aladdin(Office) {
       } else if (headers['X-MS-Exchange-Organization-AuthSource']) {
         folderName = headers['X-MS-Exchange-Organization-AuthSource']
       }
+
+      // Try to get parent folder information
+      try {
+        if (item.itemClass) {
+          // itemClass can give hints about the folder type
+          folderName = item.itemClass
+        }
+      } catch (e) {
+        console.error('Error reading itemClass', e)
+      }
+
       try {
         if (item.parentFolderId && folderName === 'Unknown') {
           folderName = item.parentFolderId
@@ -885,6 +956,7 @@ function aladdin(Office) {
       } catch (e) {
         console.error('Error reading parentFolderId', e)
       }
+
       if (this._state.userInfo) {
         this._state.userInfo.folderName = folderName
         this.saveState()
@@ -1246,7 +1318,11 @@ function aladdin(Office) {
 
       if (userNameEl) {
         if (info) {
-          userNameEl.textContent = info.userName + ' (' + info.userEmail + ')'
+          let displayText = info.userName + ' (' + info.userEmail + ')'
+          if (info.isSharedMailbox) {
+            displayText += ' [Shared]'
+          }
+          userNameEl.textContent = displayText
         } else {
           userNameEl.textContent = 'Loading...'
         }
