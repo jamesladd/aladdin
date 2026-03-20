@@ -12,11 +12,13 @@ export function createAladdin(Office) {
 }
 
 function aladdin(Office) {
-  console.log('Aladdin version: 1.91.0', new Date());
+  console.log('Aladdin version: 1.92.0', new Date());
   return {
     Office,
     _currentItemId: null,
     _itemHandlersRegistered: false,
+    _pollingInterval: null,
+    _lastPolledItemId: null,
     _state: {
       events: [],
       capturedEmail: null,
@@ -25,7 +27,9 @@ function aladdin(Office) {
       _lastCategoryInit: null,
       showMoreContact: false,
       isEditingContact: false,
-      editedContact: null
+      editedContact: null,
+      autoTrackingEnabled: true,
+      lastRefreshTime: null
     },
     state() {
       return this._state
@@ -209,6 +213,10 @@ function aladdin(Office) {
           console.error('initCategories error', e)
           this._updateUI()
         }
+
+        // Start polling for item changes (Option A feature)
+        this._startPolling()
+
       } catch (e) {
         console.error('initialize error', e)
         this.event('InitializeError', { error: e.message })
@@ -217,6 +225,137 @@ function aladdin(Office) {
         // Rule R5: Always update UI
         this._updateUI()
       }
+    },
+    _startPolling() {
+      // Clear any existing polling
+      if (this._pollingInterval) {
+        clearInterval(this._pollingInterval)
+      }
+
+      // Poll every 3 seconds for item changes
+      this._pollingInterval = setInterval(() => {
+        this._pollForItemChanges()
+      }, 3000)
+
+      this.event('PollingStarted', { interval: '3000ms' })
+    },
+    _stopPolling() {
+      if (this._pollingInterval) {
+        clearInterval(this._pollingInterval)
+        this._pollingInterval = null
+        this.event('PollingStopped')
+      }
+    },
+    async _pollForItemChanges() {
+      if (!this._state.autoTrackingEnabled) return
+
+      try {
+        const item = this.Office.context.mailbox.item
+
+        if (!item) {
+          // No item selected - check if we need to notify about previous item
+          if (this._lastPolledItemId && this._state.capturedEmail) {
+            await this._handleItemDeselection()
+            this._lastPolledItemId = null
+          }
+          return
+        }
+
+        if (!item.itemId) {
+          // Compose mode - check if we need to notify about previous item
+          if (this._lastPolledItemId && this._state.capturedEmail) {
+            await this._handleItemDeselection()
+            this._lastPolledItemId = null
+          }
+          return
+        }
+
+        const currentItemId = item.itemId
+
+        // Check if item has changed
+        if (currentItemId !== this._lastPolledItemId) {
+          this.event('PollingDetectedChange', {
+            from: this._lastPolledItemId,
+            to: currentItemId
+          })
+
+          // Handle deselection of previous item
+          if (this._lastPolledItemId && this._state.capturedEmail) {
+            if (this._state.capturedEmail.itemId === this._lastPolledItemId) {
+              await this._handleItemDeselection()
+            }
+          }
+
+          // Capture new item
+          this._lastPolledItemId = currentItemId
+          await this._captureCurrentItem(item)
+          await this._updateFolderFromHeaders(item)
+        }
+      } catch (e) {
+        console.error('Polling error:', e)
+        this.event('PollingError', { error: e.message })
+      }
+    },
+    async _handleItemDeselection() {
+      const previousEmail = this._state.capturedEmail
+      if (!previousEmail) return
+
+      try {
+        await this.notify(previousEmail)
+      } catch (e) {
+        console.error('notify error during deselection', e)
+      }
+
+      this._state.capturedEmail = null
+      this._state.contactInfo = null
+      this._currentItemId = null
+      this.saveState()
+      this._updateUI()
+    },
+    async manualRefresh() {
+      try {
+        this.event('ManualRefresh', { timestamp: new Date().toISOString() })
+
+        const item = this.Office.context.mailbox.item
+
+        if (!item) {
+          this._showAlert('No email is currently selected. Please select an email and try again.')
+          return
+        }
+
+        if (!item.itemId) {
+          this._showAlert('Cannot refresh in compose mode. Please select a received email.')
+          return
+        }
+
+        // Show loading state
+        this._state.lastRefreshTime = new Date().toISOString()
+        this._updateUI()
+
+        // Capture the item
+        await this._captureCurrentItem(item)
+        await this._updateFolderFromHeaders(item)
+
+        this._lastPolledItemId = item.itemId
+
+        this.event('ManualRefreshSuccess', { itemId: item.itemId })
+      } catch (e) {
+        console.error('Manual refresh error:', e)
+        this.event('ManualRefreshError', { error: e.message })
+        this._showAlert('Failed to refresh. Error: ' + e.message)
+      }
+    },
+    toggleAutoTracking() {
+      this._state.autoTrackingEnabled = !this._state.autoTrackingEnabled
+      this.saveState()
+
+      if (this._state.autoTrackingEnabled) {
+        this.event('AutoTrackingEnabled')
+      } else {
+        this.event('AutoTrackingDisabled')
+      }
+
+      this._updateUI()
     },
     async notify(emailData) {
       if (!emailData) return
@@ -467,7 +606,7 @@ function aladdin(Office) {
       const mailbox = this.Office.context.mailbox
       const EventType = this.Office.EventType
 
-      // ItemChanged - mailbox level
+      // ItemChanged - mailbox level (may not work in shared mailboxes)
       if (EventType.ItemChanged && mailbox.addHandlerAsync) {
         try {
           mailbox.addHandlerAsync(EventType.ItemChanged, (eventArgs) => {
@@ -479,6 +618,7 @@ function aladdin(Office) {
               this.event('ItemChangedError', { error: e.message })
             }
           })
+          this.event('ItemChangedRegistered')
         } catch (e) {
           console.error('Failed to register ItemChanged', e)
           this.event('RegisterEventError', { event: 'ItemChanged', error: e.message })
@@ -622,6 +762,7 @@ function aladdin(Office) {
           // Read mode
           try {
             await this._captureCurrentItem(item)
+            this._lastPolledItemId = item.itemId
           } catch (e) {
             console.error('captureCurrentItem error', e)
             this.event('CaptureError', { error: e.message })
@@ -773,6 +914,7 @@ function aladdin(Office) {
 
       this._currentItemId = email.itemId
       this._state.capturedEmail = email
+      this._state.lastRefreshTime = new Date().toISOString()
       this.saveState()
       this.event('EmailCaptured', { subject: email.subject, itemId: email.itemId })
 
@@ -1313,6 +1455,7 @@ function aladdin(Office) {
       const conversationSummarySectionEl = document.getElementById('conversationSummarySection')
       const actionsSectionEl = document.getElementById('actionsSection')
       const sectionTitleEls = document.querySelectorAll('.section-title-container')
+      const trackingStatusEl = document.getElementById('trackingStatus')
 
       const info = this._state.userInfo
 
@@ -1335,6 +1478,54 @@ function aladdin(Office) {
       }
       if (versionEl) {
         versionEl.textContent = (info && info.version) ? info.version : 'Unknown'
+      }
+
+      // Update tracking status
+      if (trackingStatusEl) {
+        let statusHtml = '<div class="tracking-controls">'
+
+        // Auto-tracking toggle
+        const trackingClass = this._state.autoTrackingEnabled ? 'tracking-enabled' : 'tracking-disabled'
+        const trackingText = this._state.autoTrackingEnabled ? 'Auto-tracking ON' : 'Auto-tracking OFF'
+        statusHtml += '<button id="toggleTrackingBtn" class="tracking-toggle ' + trackingClass + '">' + trackingText + '</button>'
+
+        // Manual refresh button
+        statusHtml += '<button id="manualRefreshBtn" class="refresh-btn" title="Refresh current email">⟳ Refresh</button>'
+
+        // Last refresh time
+        if (this._state.lastRefreshTime) {
+          const lastRefresh = new Date(this._state.lastRefreshTime)
+          const now = new Date()
+          const diffMs = now - lastRefresh
+          const diffSec = Math.floor(diffMs / 1000)
+          let timeAgo = ''
+          if (diffSec < 60) {
+            timeAgo = diffSec + 's ago'
+          } else if (diffSec < 3600) {
+            timeAgo = Math.floor(diffSec / 60) + 'm ago'
+          } else {
+            timeAgo = Math.floor(diffSec / 3600) + 'h ago'
+          }
+          statusHtml += '<span class="last-refresh">Last: ' + timeAgo + '</span>'
+        }
+
+        statusHtml += '</div>'
+        trackingStatusEl.innerHTML = statusHtml
+
+        // Attach event listeners
+        const toggleBtn = document.getElementById('toggleTrackingBtn')
+        if (toggleBtn) {
+          toggleBtn.onclick = () => {
+            this.toggleAutoTracking()
+          }
+        }
+
+        const refreshBtn = document.getElementById('manualRefreshBtn')
+        if (refreshBtn) {
+          refreshBtn.onclick = () => {
+            this.manualRefresh()
+          }
+        }
       }
 
       // Update Contact section title with edit and chevron buttons
