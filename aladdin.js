@@ -12,7 +12,7 @@ export function createAladdin(Office) {
 }
 
 function aladdin(Office) {
-  console.log('Aladdin version: 1.87.0', new Date());
+  console.log('Aladdin version: 1.90.0', new Date());
   return {
     Office,
     _currentItemId: null,
@@ -424,7 +424,12 @@ function aladdin(Office) {
       if (EventType.ItemChanged && mailbox.addHandlerAsync) {
         try {
           mailbox.addHandlerAsync(EventType.ItemChanged, (eventArgs) => {
-            this._handleItemChanged(eventArgs)
+            // Wrap in try-catch to prevent propagation
+            try {
+              this._handleItemChanged(eventArgs)
+            } catch (e) {
+              console.error('Error in ItemChanged handler:', e)
+            }
           })
         } catch (e) {
           console.error('Failed to register ItemChanged', e)
@@ -435,7 +440,11 @@ function aladdin(Office) {
       if (EventType.OfficeThemeChanged && mailbox.addHandlerAsync) {
         try {
           mailbox.addHandlerAsync(EventType.OfficeThemeChanged, (eventArgs) => {
-            this.event('OfficeThemeChanged', eventArgs)
+            try {
+              this.event('OfficeThemeChanged', eventArgs)
+            } catch (e) {
+              console.error('Error in OfficeThemeChanged handler:', e)
+            }
           })
         } catch (e) {
           console.error('Failed to register OfficeThemeChanged', e)
@@ -462,15 +471,19 @@ function aladdin(Office) {
         if (EventType[evtName] && item.addHandlerAsync) {
           try {
             item.addHandlerAsync(EventType[evtName], (eventArgs) => {
-              this.event(evtName, eventArgs)
-              if (evtName === 'RecipientsChanged' || evtName === 'AttachmentsChanged') {
-                this._captureCurrentItem(this.Office.context.mailbox.item).catch(e => {
-                  console.error('captureCurrentItem error in event handler', e)
-                })
+              try {
+                this.event(evtName, eventArgs)
+                if (evtName === 'RecipientsChanged' || evtName === 'AttachmentsChanged') {
+                  this._captureCurrentItem(this.Office.context.mailbox.item).catch(e => {
+                    console.error('captureCurrentItem error in event handler', e)
+                  })
+                }
+              } catch (e) {
+                console.error('Error in ' + evtName + ' handler:', e)
               }
             })
           } catch (e) {
-            console.error('Failed to register ' + evtName, e)
+            console.warn('Failed to register ' + evtName + ' (may not be supported in shared mailbox):', e)
           }
         }
       })
@@ -724,13 +737,19 @@ function aladdin(Office) {
       if (!field) return []
       if (typeof field === 'object' && field.getAsync) {
         return new Promise((resolve) => {
-          field.getAsync((result) => {
-            if (result.status === this.Office.AsyncResultStatus.Succeeded) {
-              resolve(this._formatRecipients(result.value))
-            } else {
-              resolve([])
-            }
-          })
+          try {
+            field.getAsync((result) => {
+              if (result.status === this.Office.AsyncResultStatus.Succeeded) {
+                resolve(this._formatRecipients(result.value))
+              } else {
+                console.warn(fieldName + '.getAsync failed:', result.error)
+                resolve([])
+              }
+            })
+          } catch (e) {
+            console.warn(fieldName + '.getAsync exception:', e)
+            resolve([])
+          }
         })
       }
       if (Array.isArray(field)) {
@@ -743,14 +762,20 @@ function aladdin(Office) {
       if (!from) return null
       if (typeof from === 'object' && from.getAsync) {
         return new Promise((resolve) => {
-          from.getAsync((result) => {
-            if (result.status === this.Office.AsyncResultStatus.Succeeded) {
-              const v = result.value
-              resolve(v ? { name: v.displayName || '', email: v.emailAddress || '' } : null)
-            } else {
-              resolve(null)
-            }
-          })
+          try {
+            from.getAsync((result) => {
+              if (result.status === this.Office.AsyncResultStatus.Succeeded) {
+                const v = result.value
+                resolve(v ? { name: v.displayName || '', email: v.emailAddress || '' } : null)
+              } else {
+                console.warn('from.getAsync failed:', result.error)
+                resolve(null)
+              }
+            })
+          } catch (e) {
+            console.warn('from.getAsync exception:', e)
+            resolve(null)
+          }
         })
       }
       return this._formatFrom(from)
@@ -759,13 +784,19 @@ function aladdin(Office) {
       const subject = item.subject
       if (subject && typeof subject === 'object' && subject.getAsync) {
         return new Promise((resolve) => {
-          subject.getAsync((result) => {
-            if (result.status === this.Office.AsyncResultStatus.Succeeded) {
-              resolve(result.value || '')
-            } else {
-              resolve('')
-            }
-          })
+          try {
+            subject.getAsync((result) => {
+              if (result.status === this.Office.AsyncResultStatus.Succeeded) {
+                resolve(result.value || '')
+              } else {
+                console.warn('subject.getAsync failed:', result.error)
+                resolve('')
+              }
+            })
+          } catch (e) {
+            console.warn('subject.getAsync exception:', e)
+            resolve('')
+          }
         })
       }
       return typeof subject === 'string' ? subject : ''
@@ -774,13 +805,19 @@ function aladdin(Office) {
       if (!item.categories) return []
       if (typeof item.categories === 'object' && item.categories.getAsync) {
         return new Promise((resolve) => {
-          item.categories.getAsync((result) => {
-            if (result.status === this.Office.AsyncResultStatus.Succeeded) {
-              resolve(result.value || [])
-            } else {
-              resolve([])
-            }
-          })
+          try {
+            item.categories.getAsync((result) => {
+              if (result.status === this.Office.AsyncResultStatus.Succeeded) {
+                resolve(result.value || [])
+              } else {
+                console.warn('categories.getAsync failed:', result.error)
+                resolve([])
+              }
+            })
+          } catch (e) {
+            console.warn('categories.getAsync exception:', e)
+            resolve([])
+          }
         })
       }
       if (Array.isArray(item.categories)) return item.categories
@@ -789,13 +826,19 @@ function aladdin(Office) {
     async _getInternetHeaders(item) {
       if (!item.getAllInternetHeadersAsync) return {}
       return new Promise((resolve) => {
-        item.getAllInternetHeadersAsync((result) => {
-          if (result.status === this.Office.AsyncResultStatus.Succeeded && result.value) {
-            resolve(this._parseHeaders(result.value))
-          } else {
-            resolve({})
-          }
-        })
+        try {
+          item.getAllInternetHeadersAsync((result) => {
+            if (result.status === this.Office.AsyncResultStatus.Succeeded && result.value) {
+              resolve(this._parseHeaders(result.value))
+            } else {
+              console.warn('getAllInternetHeadersAsync failed:', result.error)
+              resolve({})
+            }
+          })
+        } catch (e) {
+          console.warn('getAllInternetHeadersAsync exception:', e)
+          resolve({})
+        }
       })
     },
     _parseHeaders(headerString) {
