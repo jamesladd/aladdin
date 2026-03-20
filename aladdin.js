@@ -12,7 +12,7 @@ export function createAladdin(Office) {
 }
 
 function aladdin(Office) {
-  console.log('Aladdin version: 1.85.0', new Date());
+  console.log('Aladdin version: 1.87.0', new Date());
   return {
     Office,
     _currentItemId: null,
@@ -132,8 +132,8 @@ function aladdin(Office) {
             // Rule R1: Compose mode - explicit deselection
             shouldNotify = true
           } else {
-            const currentId = this._getGraphId(item.itemId)
-            if (currentId !== previousEmail.graphMessageId) {
+            const currentId = item.itemId
+            if (currentId !== previousEmail.itemId) {
               shouldNotify = true
             }
           }
@@ -145,7 +145,7 @@ function aladdin(Office) {
             this._state.userInfo = savedUserInfo
 
             if (this._state.capturedEmail &&
-              this._state.capturedEmail.graphMessageId === previousEmail.graphMessageId) {
+              this._state.capturedEmail.itemId === previousEmail.itemId) {
               try {
                 await this.notify(previousEmail)
               } catch (e) {
@@ -209,7 +209,7 @@ function aladdin(Office) {
         return
       }
 
-      this.event('Notify', { subject: emailData.subject, graphMessageId: emailData.graphMessageId })
+      this.event('Notify', { subject: emailData.subject, itemId: emailData.itemId })
 
       try {
         const controller = new AbortController()
@@ -227,14 +227,14 @@ function aladdin(Office) {
 
         clearTimeout(timeoutId)
         if (response.ok) {
-          this.event('NotifySuccess', { graphMessageId: emailData.graphMessageId })
+          this.event('NotifySuccess', { itemId: emailData.itemId })
         } else {
           this.event('NotifyFailed', { status: response.status })
           console.warn('notify returned status:', response.status)
         }
       } catch (e) {
         if (e.name === 'AbortError') {
-          this.event('NotifyTimeout', { graphMessageId: emailData.graphMessageId })
+          this.event('NotifyTimeout', { itemId: emailData.itemId })
           console.warn('notify timed out after 5s')
         } else {
           this.event('NotifyError', { error: e.message })
@@ -416,19 +416,6 @@ function aladdin(Office) {
         return 'Unknown'
       }
     },
-    _getGraphId(itemId) {
-      if (!itemId) return null
-      try {
-        if (this.Office.context.mailbox.convertToRestId) {
-          return this.Office.context.mailbox.convertToRestId(itemId, this.Office.MailboxEnums.RestVersion.v2_0)
-        }
-      } catch (e) {
-        // convertToRestId can fail for shared mailbox items - log warning but continue
-        console.warn('convertToRestId failed, using raw itemId', e)
-      }
-      // Always return the itemId even if conversion fails
-      return itemId
-    },
     _registerMailboxEvents() {
       const mailbox = this.Office.context.mailbox
       const EventType = this.Office.EventType
@@ -539,8 +526,8 @@ function aladdin(Office) {
           // Rule R1: Compose mode - explicit deselection
           shouldNotify = true
         } else {
-          const currentId = this._getGraphId(item.itemId)
-          if (currentId !== previousEmail.graphMessageId) {
+          const currentId = item.itemId
+          if (currentId !== previousEmail.itemId) {
             shouldNotify = true
           }
         }
@@ -552,7 +539,7 @@ function aladdin(Office) {
           this._state.userInfo = savedUserInfo2
 
           if (this._state.capturedEmail &&
-            this._state.capturedEmail.graphMessageId === previousEmail.graphMessageId) {
+            this._state.capturedEmail.itemId === previousEmail.itemId) {
             try {
               await this.notify(previousEmail)
             } catch (e) {
@@ -630,8 +617,7 @@ function aladdin(Office) {
       }
 
       const email = {
-        itemId: item.itemId,  // ← ADD THIS: Raw item ID (always available)
-        graphMessageId: this._getGraphId(item.itemId),  // ← Converted ID (may be same as itemId if conversion fails)
+        itemId: item.itemId,
         internetMessageId: null,
         to: [],
         from: null,
@@ -715,10 +701,10 @@ function aladdin(Office) {
         console.error('Error parsing sentiment', e)
       }
 
-      this._currentItemId = email.graphMessageId
+      this._currentItemId = email.itemId
       this._state.capturedEmail = email
       this.saveState()
-      this.event('EmailCaptured', { subject: email.subject, graphMessageId: email.graphMessageId })
+      this.event('EmailCaptured', { subject: email.subject, itemId: email.itemId })
 
       // Get contact information from API
       if (email.from && email.from.email) {
